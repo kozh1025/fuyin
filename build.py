@@ -193,6 +193,7 @@ def render_md(text: str) -> str:
 # --------------------------------------------------------------------------
 
 _stats = {'copied': 0, 'thumbed': 0, 'skipped': 0}
+_written = set()  # 這次建置實際產出的資產（用來清掉孤兒檔）
 
 
 def copy_asset(src: Path, rel_dir: str) -> str:
@@ -205,6 +206,7 @@ def copy_asset(src: Path, rel_dir: str) -> str:
         _stats['copied'] += 1
     else:
         _stats['skipped'] += 1
+    _written.add(dest.resolve())
     return 'assets/' + quote(f'{rel_dir}/{src.name}')
 
 
@@ -225,6 +227,7 @@ def make_thumb(src: Path, rel_dir: str) -> str:
                 )
             im.save(dest, 'JPEG', quality=THUMB_QUALITY, optimize=True)
         _stats['thumbed'] += 1
+    _written.add(dest.resolve())
     return 'assets/' + quote(f'{rel_dir}/thumbs/{dest.name}')
 
 
@@ -265,18 +268,24 @@ def build_gallery(cat_dir: Path, rel_dir: str, path_id: str):
         if f.name.startswith(('_', '.')):
             continue
         meta, body = read_md(f.with_suffix('.md'))
+        title = meta.get('title', f.stem)
+        # 圖旁邊的同名資料夾 = 這張圖的附件（懶人包的可下載檔案）
+        attach = cat_dir / f.stem
+        files = collect_files(attach, f'{rel_dir}/{f.stem}') if attach.is_dir() else []
         items.append({
             'id': f'{path_id}/{f.stem}',
-            'title': meta.get('title', f.stem),
+            'title': title,
             'img': copy_asset(f, rel_dir),
             'thumb': make_thumb(f, rel_dir),
             'phone': meta.get('phone', ''),
             'address': meta.get('address', ''),
             'tags': meta.get('tags', []),
             'note': render_md(body),
+            'files': files,
             'search': ' '.join([
-                meta.get('title', f.stem), meta.get('address', ''),
+                title, meta.get('address', ''),
                 ' '.join(meta.get('tags', [])), body,
+                ' '.join(x['name'] for x in files),
             ]).lower(),
         })
     return items
@@ -404,9 +413,14 @@ TEMPLATE = r'''<!DOCTYPE html>
     display:flex;flex-direction:column;transition:box-shadow .2s,transform .2s;
   }
   .card:hover{box-shadow:0 4px 16px rgba(0,0,0,.06);transform:translateY(-2px)}
-  .card-image-wrap{aspect-ratio:3/4;background:#f5f5f5;overflow:hidden;cursor:zoom-in}
+  .card-image-wrap{aspect-ratio:3/4;background:#f5f5f5;overflow:hidden;cursor:zoom-in;position:relative}
   .card-image{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
   .card:hover .card-image{transform:scale(1.03)}
+  .dl-badge{
+    position:absolute;top:8px;right:8px;
+    background:rgba(17,24,39,.82);color:#fff;font-size:12px;font-weight:600;
+    padding:3px 9px;border-radius:99px;
+  }
   .card-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
   .card-title{font-size:15px;font-weight:600;color:#111}
   .card-meta{font-size:12.5px;color:#6b7280;display:flex;flex-direction:column;gap:3px}
@@ -416,6 +430,24 @@ TEMPLATE = r'''<!DOCTYPE html>
   .tag{background:#fff4ea;color:#c2410c;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:500}
   .card-note{font-size:12.5px;color:#6b7280;border-top:1px solid #f3f4f6;padding-top:8px}
   .card-note p{margin:0}
+  .card-files{display:flex;flex-direction:column;gap:6px;margin-top:auto}
+  .chip{
+    display:flex;align-items:center;gap:9px;padding:8px 10px;width:100%;
+    border:1px solid #e5e7eb;border-radius:8px;background:#fff;cursor:pointer;
+    font-family:inherit;text-align:left;
+    transition:border-color .15s,background .15s;
+  }
+  .chip:hover{border-color:#06c755;background:#f0fdf4}
+  .chip-ext{
+    flex-shrink:0;font-size:10px;font-weight:700;color:#c2410c;background:#fff4ea;
+    padding:3px 6px;border-radius:5px;min-width:36px;text-align:center;
+  }
+  .chip-name{font-size:13px;color:#374151;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chip-line{
+    margin-left:auto;flex-shrink:0;white-space:nowrap;
+    font-size:12px;font-weight:700;color:#fff;background:#06c755;
+    padding:5px 10px;border-radius:6px;
+  }
   .card-actions{display:flex;gap:8px;margin-top:auto;padding-top:4px}
   .btn{
     display:inline-flex;align-items:center;justify-content:center;gap:5px;
@@ -492,7 +524,13 @@ TEMPLATE = r'''<!DOCTYPE html>
   /* ---------- Modal ---------- */
   .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:1000;justify-content:center;align-items:center;padding:24px}
   .modal.open{display:flex}
-  .modal img{max-width:100%;max-height:100%;border-radius:6px;object-fit:contain}
+  .modal-inner{display:flex;flex-direction:column;gap:14px;align-items:center;max-width:100%;max-height:100%}
+  .modal-inner img{max-width:100%;max-height:calc(100vh - 150px);border-radius:6px;object-fit:contain}
+  .modal-files{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:680px}
+  .chip-dark{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
+  .chip-dark:hover{background:rgba(255,255,255,.16);border-color:#06c755}
+  .chip-dark .chip-name{color:#f3f4f6}
+  .chip-dark .chip-ext{background:rgba(245,158,11,.2);color:#fcd34d}
   .modal-close{
     position:absolute;top:16px;right:20px;color:#fff;font-size:32px;line-height:1;
     background:none;border:none;cursor:pointer;width:44px;height:44px;border-radius:50%;
@@ -555,7 +593,10 @@ TEMPLATE = r'''<!DOCTYPE html>
 
 <div class="modal" id="modal">
   <button class="modal-close" id="modalClose" aria-label="關閉">×</button>
-  <img id="modalImg" src="" alt="">
+  <div class="modal-inner">
+    <img id="modalImg" src="" alt="">
+    <div class="modal-files" id="modalFiles"></div>
+  </div>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -565,7 +606,7 @@ const DATA = __DATA__;
 const $ = id => document.getElementById(id);
 const nav = $('nav'), content = $('content'), empty = $('empty');
 const pageTitle = $('pageTitle'), pageCount = $('pageCount'), pageDesc = $('pageDesc');
-const modal = $('modal'), modalImg = $('modalImg'), toast = $('toast');
+const modal = $('modal'), modalImg = $('modalImg'), modalFiles = $('modalFiles'), toast = $('toast');
 
 // 攤平成 id → category，id 是「區塊/類別」這種語意路徑，跟排序脫鉤。
 const CATS = {};
@@ -600,22 +641,33 @@ function cardHtml(item, i) {
   if (item.address) meta.push(`<span>📍 ${esc(item.address)}</span>`);
   // 首屏的圖一定會被看到，lazy 只會延後它們；第一排之後才交給 lazy。
   const lazy = i >= 6 ? ' loading="lazy"' : '';
+  const files = item.files || [];
   return `
     <div class="card" data-id="${esc(item.id)}">
       <div class="card-image-wrap" data-action="zoom">
         <img class="card-image" src="${item.thumb}" alt="${esc(item.title)}"${lazy}>
+        ${files.length ? `<span class="dl-badge">📎 ${files.length}</span>` : ''}
       </div>
       <div class="card-body">
         <div class="card-title">${esc(item.title)}</div>
         ${meta.length ? `<div class="card-meta">${meta.join('')}</div>` : ''}
         ${item.tags.length ? `<div class="tags">${item.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
         ${item.note ? `<div class="card-note">${item.note}</div>` : ''}
-        <div class="card-actions">
+        ${files.length
+          ? `<div class="card-files">${files.map(f => fileChip(f)).join('')}</div>`
+          : `<div class="card-actions">
           <button class="btn btn-copy" data-action="copy">📋 複製連結</button>
           <button class="btn btn-line" data-action="line">傳到 LINE</button>
-        </div>
+        </div>`}
       </div>
     </div>`;
+}
+
+function fileChip(f, dark) {
+  return `<button class="chip${dark ? ' chip-dark' : ''}" data-action="fileline" data-url="${esc(f.url)}">
+    <span class="chip-ext">${esc(f.ext)}</span>
+    <span class="chip-name">${esc(f.stem)}</span>
+    <span class="chip-line">傳到 LINE</span></button>`;
 }
 
 function filesHtml(files, heading) {
@@ -705,6 +757,14 @@ function shareLine(id) {
     '_blank', 'noopener');
 }
 
+// 把某個檔案的公開網址傳到 LINE（相對路徑要先解析成絕對網址）
+function shareFileLine(relUrl) {
+  const abs = new URL(relUrl, location.href).href;
+  window.open(
+    'https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(abs),
+    '_blank', 'noopener');
+}
+
 async function copyLink(id, btn) {
   const url = shareUrl(id);
   try {
@@ -734,6 +794,9 @@ function openModal(id) {
   if (!item) return;
   modalImg.src = item.img;          // 點開才載原圖，卡片牆只吃縮圖
   modalImg.alt = item.title;
+  const files = item.files || [];
+  modalFiles.innerHTML = files.map(f => fileChip(f, true)).join('');
+  modalFiles.style.display = files.length ? 'flex' : 'none';
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
@@ -780,10 +843,15 @@ content.addEventListener('click', e => {
   if (action === 'zoom') openModal(id);
   else if (action === 'line') shareLine(id);
   else if (action === 'copy') copyLink(id, trigger);
+  else if (action === 'fileline') shareFileLine(trigger.dataset.url);
 });
 
 $('modalClose').addEventListener('click', closeModal);
-modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+modal.addEventListener('click', e => {
+  const fl = e.target.closest('[data-action="fileline"]');
+  if (fl) { shareFileLine(fl.dataset.url); return; }
+  if (e.target === modal) closeModal();
+});
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeModal();
   if (e.key === '/' && document.activeElement !== $('searchInput')) {
@@ -825,9 +893,25 @@ window.addEventListener('hashchange', applyHash);
 '''
 
 
+def prune_orphans() -> int:
+    """刪掉 docs/assets 內這次沒產出的檔案（來源被刪除/改名留下的孤兒），再清空資料夾。"""
+    if not ASSETS.exists():
+        return 0
+    removed = 0
+    for f in ASSETS.rglob('*'):
+        if f.is_file() and f.resolve() not in _written:
+            f.unlink()
+            removed += 1
+    for d in sorted((p for p in ASSETS.rglob('*') if p.is_dir()), reverse=True):
+        if not any(d.iterdir()):
+            d.rmdir()
+    return removed
+
+
 def main():
     sections = scan()
     DOCS.mkdir(exist_ok=True)
+    orphans = prune_orphans()
     # GitHub Pages 預設跑 Jekyll，會吃掉 _ / . 開頭的路徑；關掉它。
     (DOCS / '.nojekyll').write_text('', encoding='utf-8')
 
@@ -842,7 +926,7 @@ def main():
     print(f'OK  → {DOCS / "index.html"}  ({size_kb:.1f} KB)')
     print(f'資產 → {ASSETS}  ({total:.1f} MB)')
     print(f'     複製 {_stats["copied"]} 個、縮圖 {_stats["thumbed"]} 張、'
-          f'略過 {_stats["skipped"]} 個未變更')
+          f'略過 {_stats["skipped"]} 個未變更、清除孤兒 {orphans} 個')
     if not HAS_PIL:
         print('警告：未安裝 Pillow，跳過縮圖（卡片會直接載原圖，較吃流量）')
     for sec in sections:
