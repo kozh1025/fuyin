@@ -308,6 +308,7 @@ def build_category(sec_slug: str, cat_dir: Path):
         'body': render_md(body),
         'items': [],
         'files': [],
+        'images': [],
     }
 
     if ctype == 'gallery':
@@ -315,14 +316,25 @@ def build_category(sec_slug: str, cat_dir: Path):
         cat['count'] = len(cat['items'])
     else:
         files_dir = cat_dir / 'files'
-        cat['files'] = collect_files(
-            files_dir if files_dir.exists() else cat_dir, f'{rel_dir}/files'
-        )
+        if files_dir.exists():
+            cat['files'] = collect_files(files_dir, f'{rel_dir}/files')
+        elif ctype == 'files':
+            cat['files'] = collect_files(cat_dir, f'{rel_dir}/files')
+        # doc 頁可把資料夾內的圖片依序直接內嵌顯示（例如公文掃描頁）
+        if ctype == 'doc':
+            for f in sorted(cat_dir.iterdir()):
+                if (f.is_file() and f.suffix.lower() in IMAGE_EXT
+                        and not f.name.startswith(('_', '.'))):
+                    cat['images'].append({
+                        'full': copy_asset(f, rel_dir),
+                        'alt': parse_name(f.stem)[1],
+                    })
         cat['count'] = len(cat['files'])
 
     cat['search'] = ' '.join(
         [cat_slug, meta.get('desc', ''), body]
         + [f['name'] for f in cat['files']]
+        + [im['alt'] for im in cat['images']]
     ).lower()
     return cat
 
@@ -336,7 +348,7 @@ def scan():
         smeta, _ = read_md(sec_dir / '_index.md')
         sec_slug = smeta.get('title', sec_name)
         cats = [build_category(sec_slug, c) for c in sorted_dirs(sec_dir)]
-        cats = [c for c in cats if c['count'] or c['body']]
+        cats = [c for c in cats if c['count'] or c['body'] or c['images']]
         if cats:
             sections.append({
                 'id': sec_slug,
@@ -496,23 +508,34 @@ TEMPLATE = r'''<!DOCTYPE html>
   }
   .step-text{font-size:14.5px;color:#374151;padding-top:2px}
 
+  /* ---------- Doc inline images ---------- */
+  .doc-images{display:flex;flex-direction:column;gap:16px;max-width:820px;margin-top:20px}
+  .doc-image{
+    width:100%;height:auto;display:block;background:#f5f5f5;
+    border:1px solid #eee;border-radius:10px;cursor:zoom-in;
+  }
+
   /* ---------- Files ---------- */
   .files{margin-top:28px;max-width:820px}
   .files-head{font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:.06em;margin-bottom:10px}
   .file-row{
     display:flex;align-items:center;gap:14px;background:#fff;
     border:1px solid #eee;border-radius:10px;padding:13px 16px;margin-bottom:8px;
-    text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s;
+    color:inherit;
   }
-  .file-row:hover{border-color:#f59e0b;box-shadow:0 2px 10px rgba(0,0,0,.04)}
   .file-ext{
     flex-shrink:0;width:44px;height:44px;border-radius:8px;background:#fff4ea;
     color:#c2410c;font-size:10.5px;font-weight:700;
     display:flex;align-items:center;justify-content:center;
   }
+  .file-info{flex:1;min-width:0}
   .file-name{font-size:14.5px;color:#111;font-weight:500}
   .file-size{font-size:12.5px;color:#9ca3af;margin-top:1px}
-  .file-dl{margin-left:auto;color:#c2410c;font-size:13px;font-weight:500;flex-shrink:0}
+  .btn-fileline{
+    flex-shrink:0;font-size:13px;font-weight:700;color:#fff;background:#06c755;
+    border:none;border-radius:8px;padding:9px 16px;cursor:pointer;font-family:inherit;
+  }
+  .btn-fileline:hover{background:#05a648}
 
   /* ---------- Search results ---------- */
   .result-group{margin-bottom:28px}
@@ -625,7 +648,7 @@ nav.innerHTML = DATA.map(sec => `
     <div class="nav-item" data-cat="${esc(c.id)}">
       <span class="nav-icon">${c.icon || '•'}</span>
       <span>${esc(c.name)}</span>
-      <span class="nav-count">${c.count || ''}</span>
+      <span class="nav-count">${c.type === 'gallery' && c.count ? c.count : ''}</span>
     </div>`).join('')}
 `).join('');
 
@@ -676,14 +699,14 @@ function filesHtml(files, heading) {
     <div class="files">
       ${heading ? `<div class="files-head">${esc(heading)}</div>` : ''}
       ${files.map(f => `
-        <a class="file-row" href="${f.url}" download="${esc(f.name)}">
+        <div class="file-row">
           <div class="file-ext">${esc(f.ext)}</div>
-          <div>
+          <div class="file-info">
             <div class="file-name">${esc(f.stem)}</div>
             <div class="file-size">${esc(f.ext)} · ${esc(f.size)}</div>
           </div>
-          <div class="file-dl">下載 ↓</div>
-        </a>`).join('')}
+          <button class="btn-fileline" data-action="fileline" data-url="${esc(f.url)}">傳到 LINE</button>
+        </div>`).join('')}
     </div>`;
 }
 
@@ -696,11 +719,15 @@ function renderCategory(cat) {
   if (cat.type === 'gallery') {
     content.innerHTML = `<div class="gallery">${cat.items.map(cardHtml).join('')}</div>`;
   } else {
+    const imgs = (cat.images || []).map(im =>
+      `<img class="doc-image" data-action="docimg" data-full="${im.full}" src="${im.full}" alt="${esc(im.alt)}" loading="lazy">`
+    ).join('');
     content.innerHTML =
       (cat.body ? `<div class="doc">${cat.body}</div>` : '') +
-      filesHtml(cat.files, '表單與附件');
+      (imgs ? `<div class="doc-images">${imgs}</div>` : '') +
+      filesHtml(cat.files, '傳到 LINE');
   }
-  empty.style.display = (cat.count || cat.body) ? 'none' : 'block';
+  empty.style.display = (cat.count || cat.body || (cat.images && cat.images.length)) ? 'none' : 'block';
 }
 
 function renderSearch(q) {
@@ -800,6 +827,16 @@ function openModal(id) {
   modal.classList.add('open');
   document.body.style.overflow = 'hidden';
 }
+// 內嵌圖片放大（doc 頁的公文/速查表），純看圖、無附件列
+function openImage(full, alt) {
+  modalImg.src = full;
+  modalImg.alt = alt || '';
+  modalFiles.innerHTML = '';
+  modalFiles.style.display = 'none';
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
 function closeModal() {
   modal.classList.remove('open');
   document.body.style.overflow = '';
@@ -837,13 +874,16 @@ content.addEventListener('click', e => {
     render();
     return;
   }
+  // doc 頁的檔案/圖片不在 .card 內，要在 card 判斷前處理
+  if (action === 'fileline') { shareFileLine(trigger.dataset.url); return; }
+  if (action === 'docimg') { openImage(trigger.dataset.full, trigger.getAttribute('alt')); return; }
+
   const card = e.target.closest('.card');
   if (!card) return;
   const id = card.dataset.id;
   if (action === 'zoom') openModal(id);
   else if (action === 'line') shareLine(id);
   else if (action === 'copy') copyLink(id, trigger);
-  else if (action === 'fileline') shareFileLine(trigger.dataset.url);
 });
 
 $('modalClose').addEventListener('click', closeModal);
