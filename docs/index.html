@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>分隊資訊站</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Microsoft JhengHei","PingFang TC",sans-serif;
+    color:#1f2937;background:#fafafa;line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .layout{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    background:#fff;border-right:1px solid #eee;
+    padding:24px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;
+  }
+  .brand{
+    display:flex;align-items:center;gap:8px;
+    font-size:16px;font-weight:600;color:#111;padding:4px 10px 18px;
+  }
+  .sec-label{
+    font-size:11px;font-weight:700;color:#9ca3af;
+    letter-spacing:.08em;padding:14px 12px 6px;text-transform:uppercase;
+  }
+  .nav-item{
+    display:flex;align-items:center;gap:10px;
+    padding:10px 12px;margin-bottom:2px;border-radius:8px;cursor:pointer;
+    font-size:14.5px;color:#374151;user-select:none;
+    transition:background .15s,color .15s;
+  }
+  .nav-item:hover{background:#f5f5f5}
+  .nav-item.active{background:#fff4ea;color:#c2410c;font-weight:600}
+  .nav-icon{width:18px;text-align:center;flex-shrink:0;font-size:15px}
+  .nav-count{margin-left:auto;color:#9ca3af;font-size:12.5px}
+  .nav-item.active .nav-count{color:#c2410c}
+
+  /* ---------- Main ---------- */
+  .main{padding:30px 40px 60px;max-width:1400px}
+  .top-bar{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+  .page-title{font-size:22px;font-weight:600;color:#111;display:flex;align-items:baseline;gap:10px}
+  .page-title .count{font-size:14px;color:#9ca3af;font-weight:400}
+  .page-desc{color:#6b7280;font-size:14px;margin-bottom:22px}
+  .search{position:relative;flex:1;max-width:400px;margin-left:auto}
+  .search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9ca3af;font-size:15px;pointer-events:none}
+  .search input{
+    width:100%;padding:10px 16px 10px 40px;
+    border:1px solid #e5e7eb;border-radius:10px;font-size:14px;
+    background:#fff;font-family:inherit;transition:border-color .15s,box-shadow .15s;
+  }
+  .search input:focus{outline:none;border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.12)}
+
+  /* ---------- Gallery ---------- */
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px}
+  .card{
+    background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;
+    display:flex;flex-direction:column;transition:box-shadow .2s,transform .2s;
+  }
+  .card:hover{box-shadow:0 4px 16px rgba(0,0,0,.06);transform:translateY(-2px)}
+  .card-image-wrap{aspect-ratio:3/4;background:#f5f5f5;overflow:hidden;cursor:zoom-in}
+  .card-image{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+  .card:hover .card-image{transform:scale(1.03)}
+  .card-body{padding:14px 16px 16px;display:flex;flex-direction:column;gap:8px;flex:1}
+  .card-title{font-size:15px;font-weight:600;color:#111}
+  .card-meta{font-size:12.5px;color:#6b7280;display:flex;flex-direction:column;gap:3px}
+  .card-meta a{color:#c2410c;text-decoration:none}
+  .card-meta a:hover{text-decoration:underline}
+  .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .tag{background:#fff4ea;color:#c2410c;font-size:11px;padding:2px 8px;border-radius:99px;font-weight:500}
+  .card-note{font-size:12.5px;color:#6b7280;border-top:1px solid #f3f4f6;padding-top:8px}
+  .card-note p{margin:0}
+  .card-actions{display:flex;gap:8px;margin-top:auto;padding-top:4px}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:5px;
+    padding:8px 12px;border-radius:8px;font-size:13px;font-weight:500;
+    cursor:pointer;border:1px solid transparent;text-decoration:none;
+    font-family:inherit;flex:1;transition:background .15s,border-color .15s;
+  }
+  .btn-line{background:#06c755;color:#fff}
+  .btn-line:hover{background:#05a648}
+  .btn-copy{background:#fff;color:#4b5563;border-color:#e5e7eb}
+  .btn-copy:hover{background:#f9fafb;border-color:#d1d5db}
+  .btn.copied{background:#10b981;color:#fff;border-color:#10b981}
+
+  /* ---------- Doc ---------- */
+  .doc{background:#fff;border:1px solid #eee;border-radius:12px;padding:32px 36px;max-width:820px}
+  .doc h1{font-size:20px;margin:26px 0 12px;color:#111;font-weight:600}
+  .doc h2{font-size:18px;margin:28px 0 12px;color:#111;font-weight:600}
+  .doc h1:first-child,.doc h2:first-child{margin-top:0}
+  .doc h3{font-size:15.5px;margin:20px 0 8px;color:#374151;font-weight:600}
+  .doc h4{font-size:14.5px;margin:16px 0 6px;color:#4b5563;font-weight:600}
+  .doc p{margin:10px 0;color:#374151;font-size:14.5px}
+  .doc code{background:#f3f4f6;padding:2px 6px;border-radius:4px;font-size:13px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .doc pre{
+    background:#1f2937;padding:14px 16px;border-radius:8px;
+    overflow-x:auto;margin:14px 0;
+  }
+  .doc pre code{
+    background:none;padding:0;color:#e5e7eb;font-size:12.5px;line-height:1.7;
+    white-space:pre;
+  }
+  .doc a{color:#c2410c}
+  .doc blockquote{
+    border-left:3px solid #f59e0b;background:#fffbeb;
+    padding:12px 16px;margin:16px 0;border-radius:0 8px 8px 0;
+    color:#92400e;font-size:14px;
+  }
+  .bullets{margin:10px 0 10px 20px;color:#374151;font-size:14.5px}
+  .bullets li{margin:5px 0}
+  .steps{list-style:none;margin:16px 0;display:flex;flex-direction:column;gap:2px}
+  .steps li{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid #f3f4f6}
+  .steps li:last-child{border-bottom:none}
+  .step-num{
+    flex-shrink:0;width:26px;height:26px;border-radius:50%;
+    background:#fff4ea;color:#c2410c;font-size:13px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;margin-top:1px;
+  }
+  .step-text{font-size:14.5px;color:#374151;padding-top:2px}
+
+  /* ---------- Files ---------- */
+  .files{margin-top:28px;max-width:820px}
+  .files-head{font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:.06em;margin-bottom:10px}
+  .file-row{
+    display:flex;align-items:center;gap:14px;background:#fff;
+    border:1px solid #eee;border-radius:10px;padding:13px 16px;margin-bottom:8px;
+    text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s;
+  }
+  .file-row:hover{border-color:#f59e0b;box-shadow:0 2px 10px rgba(0,0,0,.04)}
+  .file-ext{
+    flex-shrink:0;width:44px;height:44px;border-radius:8px;background:#fff4ea;
+    color:#c2410c;font-size:10.5px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .file-name{font-size:14.5px;color:#111;font-weight:500}
+  .file-size{font-size:12.5px;color:#9ca3af;margin-top:1px}
+  .file-dl{margin-left:auto;color:#c2410c;font-size:13px;font-weight:500;flex-shrink:0}
+
+  /* ---------- Search results ---------- */
+  .result-group{margin-bottom:28px}
+  .result-label{
+    font-size:12px;font-weight:700;color:#9ca3af;letter-spacing:.06em;
+    margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid #eee;
+  }
+
+  /* ---------- Modal ---------- */
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:1000;justify-content:center;align-items:center;padding:24px}
+  .modal.open{display:flex}
+  .modal img{max-width:100%;max-height:100%;border-radius:6px;object-fit:contain}
+  .modal-close{
+    position:absolute;top:16px;right:20px;color:#fff;font-size:32px;line-height:1;
+    background:none;border:none;cursor:pointer;width:44px;height:44px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;transition:background .15s;
+  }
+  .modal-close:hover{background:rgba(255,255,255,.12)}
+
+  .empty{text-align:center;padding:80px 20px;color:#9ca3af;font-size:15px}
+  .toast{
+    position:fixed;bottom:32px;left:50%;transform:translateX(-50%) translateY(100px);
+    background:#111;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;
+    z-index:2000;opacity:0;transition:opacity .2s,transform .2s;pointer-events:none;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ---------- Mobile ---------- */
+  @media(max-width:768px){
+    .layout{grid-template-columns:1fr}
+    .sidebar{
+      position:sticky;top:0;height:auto;padding:10px;display:flex;gap:6px;
+      border-right:none;border-bottom:1px solid #eee;overflow-x:auto;z-index:10;
+    }
+    .brand,.sec-label{display:none}
+    .nav-item{flex-shrink:0;margin-bottom:0;padding:8px 14px;white-space:nowrap}
+    .nav-count{margin-left:6px}
+    .main{padding:18px 14px 40px}
+    .top-bar{flex-direction:column;align-items:stretch;gap:10px}
+    .search{max-width:none;margin-left:0}
+    .gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+    .card-body{padding:12px}
+    .doc{padding:22px 18px}
+    .btn{padding:7px 8px;font-size:12px}
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand"><span>🚒</span><span>分隊資訊站</span></div>
+    <nav id="nav"></nav>
+  </aside>
+
+  <main class="main">
+    <div class="top-bar">
+      <div class="page-title">
+        <span id="pageTitle"></span>
+        <span class="count" id="pageCount"></span>
+      </div>
+      <div class="search">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="搜尋全站（店家、業務、表單…）" autocomplete="off">
+      </div>
+    </div>
+    <div class="page-desc" id="pageDesc"></div>
+    <div id="content"></div>
+    <div class="empty" id="empty" style="display:none">找不到符合的項目</div>
+  </main>
+</div>
+
+<div class="modal" id="modal">
+  <button class="modal-close" id="modalClose" aria-label="關閉">×</button>
+  <img id="modalImg" src="" alt="">
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA = [{"id":"生活","name":"生活","icon":"","categories":[{"id":"生活/吃","name":"吃","icon":"","type":"gallery","desc":"","body":"","items":[{"id":"生活/吃/中港牛肉麵","title":"中港牛肉麵","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E4%B8%AD%E6%B8%AF%E7%89%9B%E8%82%89%E9%BA%B5.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E4%B8%AD%E6%B8%AF%E7%89%9B%E8%82%89%E9%BA%B5.jpg","phone":"","address":"","tags":[],"note":"","search":"中港牛肉麵   "},{"id":"生活/吃/傳品","title":"傳品","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E5%82%B3%E5%93%81.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E5%82%B3%E5%93%81.jpg","phone":"","address":"","tags":[],"note":"","search":"傳品   "},{"id":"生活/吃/天香腿庫飯","title":"天香腿庫飯","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E5%A4%A9%E9%A6%99%E8%85%BF%E5%BA%AB%E9%A3%AF.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E5%A4%A9%E9%A6%99%E8%85%BF%E5%BA%AB%E9%A3%AF.jpg","phone":"","address":"","tags":[],"note":"","search":"天香腿庫飯   "},{"id":"生活/吃/尼好","title":"尼好","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E5%B0%BC%E5%A5%BD.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E5%B0%BC%E5%A5%BD.jpg","phone":"","address":"","tags":[],"note":"","search":"尼好   "},{"id":"生活/吃/川豫","title":"川豫","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E5%B7%9D%E8%B1%AB.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E5%B7%9D%E8%B1%AB.jpg","phone":"","address":"","tags":[],"note":"","search":"川豫   "},{"id":"生活/吃/帝品水餃牛肉麵","title":"帝品水餃牛肉麵","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E5%B8%9D%E5%93%81%E6%B0%B4%E9%A4%83%E7%89%9B%E8%82%89%E9%BA%B5.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E5%B8%9D%E5%93%81%E6%B0%B4%E9%A4%83%E7%89%9B%E8%82%89%E9%BA%B5.jpg","phone":"","address":"","tags":[],"note":"","search":"帝品水餃牛肉麵   "},{"id":"生活/吃/文寶鵝肉館","title":"文寶鵝肉館","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E6%96%87%E5%AF%B6%E9%B5%9D%E8%82%89%E9%A4%A8.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E6%96%87%E5%AF%B6%E9%B5%9D%E8%82%89%E9%A4%A8.jpg","phone":"","address":"","tags":[],"note":"","search":"文寶鵝肉館   "},{"id":"生活/吃/炒燴香","title":"炒燴香","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E7%82%92%E7%87%B4%E9%A6%99.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E7%82%92%E7%87%B4%E9%A6%99.jpg","phone":"","address":"","tags":[],"note":"","search":"炒燴香   "},{"id":"生活/吃/阿忠","title":"阿忠","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E9%98%BF%E5%BF%A0.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E9%98%BF%E5%BF%A0.jpg","phone":"","address":"","tags":[],"note":"","search":"阿忠   "},{"id":"生活/吃/雙鳳","title":"雙鳳","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E9%9B%99%E9%B3%B3.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E9%9B%99%E9%B3%B3.jpg","phone":"","address":"","tags":[],"note":"","search":"雙鳳   "},{"id":"生活/吃/香港鳳翔燒臘","title":"香港鳳翔燒臘","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E9%A6%99%E6%B8%AF%E9%B3%B3%E7%BF%94%E7%87%92%E8%87%98.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E9%A6%99%E6%B8%AF%E9%B3%B3%E7%BF%94%E7%87%92%E8%87%98.jpg","phone":"","address":"","tags":[],"note":"","search":"香港鳳翔燒臘   "},{"id":"生活/吃/鵝香世家","title":"鵝香世家","img":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/%E9%B5%9D%E9%A6%99%E4%B8%96%E5%AE%B6.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%90%83/thumbs/%E9%B5%9D%E9%A6%99%E4%B8%96%E5%AE%B6.jpg","phone":"","address":"","tags":[],"note":"","search":"鵝香世家   "}],"files":[],"count":12,"search":"吃  "},{"id":"生活/喝","name":"喝","icon":"","type":"gallery","desc":"","body":"","items":[{"id":"生活/喝/一沫口","title":"一沫口","img":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/%E4%B8%80%E6%B2%AB%E5%8F%A3.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/thumbs/%E4%B8%80%E6%B2%AB%E5%8F%A3.jpg","phone":"","address":"","tags":[],"note":"","search":"一沫口   "},{"id":"生活/喝/參杯","title":"參杯","img":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/%E5%8F%83%E6%9D%AF.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/thumbs/%E5%8F%83%E6%9D%AF.jpg","phone":"","address":"","tags":[],"note":"","search":"參杯   "},{"id":"生活/喝/小茶齋","title":"小茶齋","img":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/%E5%B0%8F%E8%8C%B6%E9%BD%8B.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/thumbs/%E5%B0%8F%E8%8C%B6%E9%BD%8B.jpg","phone":"","address":"","tags":[],"note":"","search":"小茶齋   "},{"id":"生活/喝/得正","title":"得正","img":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/%E5%BE%97%E6%AD%A3.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/thumbs/%E5%BE%97%E6%AD%A3.jpg","phone":"","address":"","tags":[],"note":"","search":"得正   "},{"id":"生活/喝/沫飲","title":"沫飲","img":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/%E6%B2%AB%E9%A3%B2.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/thumbs/%E6%B2%AB%E9%A3%B2.jpg","phone":"","address":"","tags":[],"note":"","search":"沫飲   "},{"id":"生活/喝/無名","title":"無名","img":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/%E7%84%A1%E5%90%8D.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/thumbs/%E7%84%A1%E5%90%8D.jpg","phone":"","address":"","tags":[],"note":"","search":"無名   "},{"id":"生活/喝/紅茶老爹","title":"紅茶老爹","img":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/%E7%B4%85%E8%8C%B6%E8%80%81%E7%88%B9.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/thumbs/%E7%B4%85%E8%8C%B6%E8%80%81%E7%88%B9.jpg","phone":"","address":"","tags":[],"note":"","search":"紅茶老爹   "},{"id":"生活/喝/金剛咖啡茶飲","title":"金剛咖啡茶飲","img":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/%E9%87%91%E5%89%9B%E5%92%96%E5%95%A1%E8%8C%B6%E9%A3%B2.jpg","thumb":"assets/%E7%94%9F%E6%B4%BB/%E5%96%9D/thumbs/%E9%87%91%E5%89%9B%E5%92%96%E5%95%A1%E8%8C%B6%E9%A3%B2.jpg","phone":"","address":"","tags":[],"note":"","search":"金剛咖啡茶飲   "}],"files":[],"count":8,"search":"喝  "}]},{"id":"公務","name":"公務","icon":"","categories":[{"id":"公務/如何新增業務","name":"如何新增業務","icon":"📘","type":"doc","desc":"這頁本身就是格式範本 —— 照著做就能新增一個業務頁","body":"<h2>新增一個業務</h2>\n<ol class=\"steps\"><li><span class=\"step-num\">1</span><div class=\"step-text\">在 <code>content/20-公務/</code> 底下開一個資料夾，名稱格式是 <code>數字-業務名稱</code>，例如 <code>20-救護業務</code>。數字只決定側邊欄的排序，顯示時會自動去掉。</div></li><li><span class=\"step-num\">2</span><div class=\"step-text\">在該資料夾內建一個 <code>_index.md</code>，開頭貼上下面的設定區塊。</div></li><li><span class=\"step-num\">3</span><div class=\"step-text\">要讓人下載的表單，放進該資料夾底下的 <code>files/</code> 子資料夾。</div></li><li><span class=\"step-num\">4</span><div class=\"step-text\">回到 <code>分隊菜單</code> 資料夾，執行 <code>python build.py</code>。</div></li><li><span class=\"step-num\">5</span><div class=\"step-text\">把 <code>docs/</code> 推上 GitHub，網站就更新了。</div></li></ol>\n<blockquote>全程不需要修改 <code>build.py</code>。新增業務就是開資料夾，腳本會自己掃到。</blockquote>\n<h2>_index.md 的設定區塊</h2>\n<p>檔案最上面用三個減號包起來的部分是設定，下面才是內文：</p>\n<pre><code>---\ntype: doc\nicon: 🚑\ntitle: 救護業務\ndesc: 一句話說明這個業務在做什麼\n---</code></pre>\n<p><code>type</code> 有三種：<code>doc</code> 是說明頁（步驟 + 附件下載），<code>files</code> 是純檔案清單，<code>gallery</code> 是圖片卡片牆（吃、喝用的就是這種）。<code>icon</code> 和 <code>desc</code> 可以不寫。</p>\n<h2>內文怎麼寫</h2>\n<p>內文用 Markdown。<strong>數字開頭的清單會自動變成上面那種步驟卡片</strong>，這是業務說明最常用的格式。其他支援的寫法：</p>\n<ul class=\"bullets\"><li><code>## 標題</code> 分段</li><li><code>- </code> 開頭是項目符號</li><li><code><strong>粗體</strong></code>、`<code> </code>程式碼<code> </code><code>、</code><a href=\"網址\" target=\"_blank\" rel=\"noopener\">連結文字</a>`</li><li><code>&gt;</code> 開頭會變成上面那種黃色的注意事項框</li></ul>\n<h2>店家資料要補電話地址</h2>\n<p><code>吃</code> 和 <code>喝</code> 底下，在圖片旁邊放一個同名的 <code>.md</code> 就會自動吃進去。例如 <code>中港牛肉麵.jpg</code> 旁邊放 <code>中港牛肉麵.md</code>：</p>\n<pre><code>---\nphone: 04-2222-3333\naddress: 台中市西屯區台灣大道三段 100 號\ntags: 麵食, 平價\n---\n推薦紅燒牛肉麵，11:30 前不用排隊。</code></pre>\n<p>不放也沒關係，就維持現在只顯示店名的樣子。</p>","items":[],"files":[],"count":0,"search":"如何新增業務 這頁本身就是格式範本 —— 照著做就能新增一個業務頁 ## 新增一個業務\n\n1. 在 `content/20-公務/` 底下開一個資料夾，名稱格式是 `數字-業務名稱`，例如 `20-救護業務`。數字只決定側邊欄的排序，顯示時會自動去掉。\n2. 在該資料夾內建一個 `_index.md`，開頭貼上下面的設定區塊。\n3. 要讓人下載的表單，放進該資料夾底下的 `files/` 子資料夾。\n4. 回到 `分隊菜單` 資料夾，執行 `python build.py`。\n5. 把 `docs/` 推上 github，網站就更新了。\n\n> 全程不需要修改 `build.py`。新增業務就是開資料夾，腳本會自己掃到。\n\n## _index.md 的設定區塊\n\n檔案最上面用三個減號包起來的部分是設定，下面才是內文：\n\n```\n---\ntype: doc\nicon: 🚑\ntitle: 救護業務\ndesc: 一句話說明這個業務在做什麼\n---\n```\n\n`type` 有三種：`doc` 是說明頁（步驟 + 附件下載），`files` 是純檔案清單，`gallery` 是圖片卡片牆（吃、喝用的就是這種）。`icon` 和 `desc` 可以不寫。\n\n## 內文怎麼寫\n\n內文用 markdown。**數字開頭的清單會自動變成上面那種步驟卡片**，這是業務說明最常用的格式。其他支援的寫法：\n\n- `## 標題` 分段\n- `- ` 開頭是項目符號\n- `**粗體**`、`` `程式碼` ``、`[連結文字](網址)`\n- `>` 開頭會變成上面那種黃色的注意事項框\n\n## 店家資料要補電話地址\n\n`吃` 和 `喝` 底下，在圖片旁邊放一個同名的 `.md` 就會自動吃進去。例如 `中港牛肉麵.jpg` 旁邊放 `中港牛肉麵.md`：\n\n```\n---\nphone: 04-2222-3333\naddress: 台中市西屯區台灣大道三段 100 號\ntags: 麵食, 平價\n---\n推薦紅燒牛肉麵，11:30 前不用排隊。\n```\n\n不放也沒關係，就維持現在只顯示店名的樣子。"}]}];
+
+const $ = id => document.getElementById(id);
+const nav = $('nav'), content = $('content'), empty = $('empty');
+const pageTitle = $('pageTitle'), pageCount = $('pageCount'), pageDesc = $('pageDesc');
+const modal = $('modal'), modalImg = $('modalImg'), toast = $('toast');
+
+// 攤平成 id → category，id 是「區塊/類別」這種語意路徑，跟排序脫鉤。
+const CATS = {};
+DATA.forEach(sec => sec.categories.forEach(c => { CATS[c.id] = { ...c, section: sec.name }; }));
+
+let currentCat = DATA[0]?.categories[0]?.id || '';
+let currentQuery = '';
+
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]);
+
+/* ---------- Sidebar ---------- */
+nav.innerHTML = DATA.map(sec => `
+  <div class="sec-label">${esc(sec.name)}</div>
+  ${sec.categories.map(c => `
+    <div class="nav-item" data-cat="${esc(c.id)}">
+      <span class="nav-icon">${c.icon || '•'}</span>
+      <span>${esc(c.name)}</span>
+      <span class="nav-count">${c.count || ''}</span>
+    </div>`).join('')}
+`).join('');
+
+function setActiveNav() {
+  document.querySelectorAll('.nav-item').forEach(el =>
+    el.classList.toggle('active', !currentQuery && el.dataset.cat === currentCat));
+}
+
+/* ---------- Renderers ---------- */
+function cardHtml(item, i) {
+  const meta = [];
+  if (item.phone) meta.push(`<span>📞 <a href="tel:${esc(item.phone)}">${esc(item.phone)}</a></span>`);
+  if (item.address) meta.push(`<span>📍 ${esc(item.address)}</span>`);
+  // 首屏的圖一定會被看到，lazy 只會延後它們；第一排之後才交給 lazy。
+  const lazy = i >= 6 ? ' loading="lazy"' : '';
+  return `
+    <div class="card" data-id="${esc(item.id)}">
+      <div class="card-image-wrap" data-action="zoom">
+        <img class="card-image" src="${item.thumb}" alt="${esc(item.title)}"${lazy}>
+      </div>
+      <div class="card-body">
+        <div class="card-title">${esc(item.title)}</div>
+        ${meta.length ? `<div class="card-meta">${meta.join('')}</div>` : ''}
+        ${item.tags.length ? `<div class="tags">${item.tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}
+        ${item.note ? `<div class="card-note">${item.note}</div>` : ''}
+        <div class="card-actions">
+          <button class="btn btn-copy" data-action="copy">📋 複製連結</button>
+          <button class="btn btn-line" data-action="line">傳到 LINE</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function filesHtml(files, heading) {
+  if (!files.length) return '';
+  return `
+    <div class="files">
+      ${heading ? `<div class="files-head">${esc(heading)}</div>` : ''}
+      ${files.map(f => `
+        <a class="file-row" href="${f.url}" download="${esc(f.name)}">
+          <div class="file-ext">${esc(f.ext)}</div>
+          <div>
+            <div class="file-name">${esc(f.stem)}</div>
+            <div class="file-size">${esc(f.ext)} · ${esc(f.size)}</div>
+          </div>
+          <div class="file-dl">下載 ↓</div>
+        </a>`).join('')}
+    </div>`;
+}
+
+function renderCategory(cat) {
+  pageTitle.textContent = cat.name;
+  pageCount.textContent = cat.type === 'gallery' ? `共 ${cat.count} 家` :
+    cat.count ? `${cat.count} 份文件` : '';
+  pageDesc.textContent = cat.desc || '';
+
+  if (cat.type === 'gallery') {
+    content.innerHTML = `<div class="gallery">${cat.items.map(cardHtml).join('')}</div>`;
+  } else {
+    content.innerHTML =
+      (cat.body ? `<div class="doc">${cat.body}</div>` : '') +
+      filesHtml(cat.files, '表單與附件');
+  }
+  empty.style.display = (cat.count || cat.body) ? 'none' : 'block';
+}
+
+function renderSearch(q) {
+  pageTitle.textContent = '搜尋結果';
+  pageDesc.textContent = `關鍵字：${q}`;
+  let total = 0;
+  const groups = Object.values(CATS).map(cat => {
+    const items = (cat.items || []).filter(x => x.search.includes(q));
+    const files = (cat.files || []).filter(f => f.name.toLowerCase().includes(q));
+    const catHit = cat.search.includes(q);
+    if (!items.length && !files.length && !catHit) return '';
+    total += items.length + files.length + (catHit && !items.length && !files.length ? 1 : 0);
+    const label = `${cat.section} / ${cat.name}`;
+    let body = '';
+    if (items.length) body += `<div class="gallery">${items.map(cardHtml).join('')}</div>`;
+    if (files.length) body += filesHtml(files, '');
+    if (!body && catHit) {
+      body = `<div class="file-row" data-action="goto" data-goto="${esc(cat.id)}" style="cursor:pointer">
+        <div class="file-ext">${cat.icon || '📄'}</div>
+        <div><div class="file-name">${esc(cat.name)}</div>
+        <div class="file-size">${esc(cat.desc || '符合此業務說明')}</div></div>
+        <div class="file-dl">前往 →</div></div>`;
+    }
+    return `<div class="result-group"><div class="result-label">${esc(label)}</div>${body}</div>`;
+  }).filter(Boolean);
+
+  pageCount.textContent = `${total} 筆`;
+  content.innerHTML = groups.join('');
+  empty.style.display = total ? 'none' : 'block';
+}
+
+function render() {
+  if (currentQuery) renderSearch(currentQuery);
+  else if (CATS[currentCat]) renderCategory(CATS[currentCat]);
+  setActiveNav();
+}
+
+/* ---------- Share ---------- */
+function findItem(id) {
+  for (const c of Object.values(CATS)) {
+    const hit = (c.items || []).find(x => x.id === id);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+// 語意路徑當 hash：新增資料不會讓舊連結指到別家店。
+const shareUrl = id =>
+  location.origin + location.pathname + '#' + encodeURIComponent(id);
+
+function shareLine(id) {
+  window.open(
+    'https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(shareUrl(id)),
+    '_blank', 'noopener');
+}
+
+async function copyLink(id, btn) {
+  const url = shareUrl(id);
+  try {
+    await navigator.clipboard.writeText(url);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+  btn.classList.add('copied');
+  btn.textContent = '✓ 已複製';
+  setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '📋 複製連結'; }, 1500);
+}
+
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+/* ---------- Modal ---------- */
+function openModal(id) {
+  const item = findItem(id);
+  if (!item) return;
+  modalImg.src = item.img;          // 點開才載原圖，卡片牆只吃縮圖
+  modalImg.alt = item.title;
+  modal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal() {
+  modal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+/* ---------- Events ---------- */
+nav.addEventListener('click', e => {
+  const el = e.target.closest('.nav-item');
+  if (!el) return;
+  currentQuery = '';
+  $('searchInput').value = '';
+  currentCat = el.dataset.cat;
+  location.hash = encodeURIComponent(currentCat);
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+let searchTimer;
+$('searchInput').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const v = e.target.value.trim().toLowerCase();
+  searchTimer = setTimeout(() => { currentQuery = v; render(); }, 120);
+});
+
+content.addEventListener('click', e => {
+  const trigger = e.target.closest('[data-action]');
+  if (!trigger) return;
+  const action = trigger.dataset.action;
+
+  if (action === 'goto') {
+    currentQuery = '';
+    $('searchInput').value = '';
+    currentCat = trigger.dataset.goto;
+    location.hash = encodeURIComponent(currentCat);
+    render();
+    return;
+  }
+  const card = e.target.closest('.card');
+  if (!card) return;
+  const id = card.dataset.id;
+  if (action === 'zoom') openModal(id);
+  else if (action === 'line') shareLine(id);
+  else if (action === 'copy') copyLink(id, trigger);
+});
+
+$('modalClose').addEventListener('click', closeModal);
+modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+  if (e.key === '/' && document.activeElement !== $('searchInput')) {
+    e.preventDefault();
+    $('searchInput').focus();
+  }
+});
+
+/* ---------- Deep link ---------- */
+function applyHash() {
+  const raw = decodeURIComponent(location.hash.slice(1));
+  if (!raw) { render(); return; }
+
+  if (CATS[raw]) { currentCat = raw; render(); return; }
+
+  // 「區塊/類別/項目」→ 切到該類別並高亮該項目
+  const catId = raw.split('/').slice(0, 2).join('/');
+  if (CATS[catId]) {
+    currentCat = catId;
+    currentQuery = '';
+    render();
+    const card = content.querySelector(`.card[data-id="${CSS.escape(raw)}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.style.transition = 'box-shadow .3s';
+      card.style.boxShadow = '0 0 0 3px #f59e0b';
+      setTimeout(() => { card.style.boxShadow = ''; }, 1600);
+    }
+    return;
+  }
+  render();
+}
+
+applyHash();
+window.addEventListener('hashchange', applyHash);
+</script>
+</body>
+</html>
