@@ -40,6 +40,9 @@ ASSETS = DOCS / 'assets'
 IMAGE_EXT = {'.jpg', '.jpeg', '.png', '.webp', '.gif'}
 THUMB_WIDTH = 480
 THUMB_QUALITY = 78
+DOC_IMG_WIDTH = 1600
+DOC_IMG_QUALITY = 82
+DOC_IMG_SIZE_THRESHOLD = 400 * 1024
 
 ORDER_RE = re.compile(r'^(\d+)[-_](.+)$')
 
@@ -250,6 +253,28 @@ def make_thumb(src: Path, rel_dir: str) -> str:
     return 'assets/' + quote(f'{rel_dir}/thumbs/{dest.name}')
 
 
+def make_doc_image(src: Path, rel_dir: str) -> str:
+    """doc 頁內嵌大圖：超過門檻才縮寬＋轉 JPEG 壓縮，避免手機讀圖太慢；
+    本來就夠小的原圖（掃描件、截圖）直接原樣複製，不重壓一次。"""
+    if not HAS_PIL or src.stat().st_size <= DOC_IMG_SIZE_THRESHOLD:
+        return copy_asset(src, rel_dir)
+    dest_dir = ASSETS / rel_dir
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / (src.stem + '.jpg')
+    if not dest.exists() or src.stat().st_mtime > dest.stat().st_mtime:
+        with Image.open(src) as im:
+            im = im.convert('RGB')
+            w, h = im.size
+            if w > DOC_IMG_WIDTH:
+                im = im.resize(
+                    (DOC_IMG_WIDTH, round(h * DOC_IMG_WIDTH / w)), Image.LANCZOS
+                )
+            im.save(dest, 'JPEG', quality=DOC_IMG_QUALITY, optimize=True)
+        _stats['copied'] += 1
+    _written.add(dest.resolve())
+    return 'assets/' + quote(f'{rel_dir}/{dest.name}')
+
+
 def human_size(n: int) -> str:
     for unit in ('B', 'KB', 'MB', 'GB'):
         if n < 1024:
@@ -351,7 +376,7 @@ def build_category(sec_slug: str, cat_dir: Path):
                 if (f.is_file() and f.suffix.lower() in IMAGE_EXT
                         and not f.name.startswith(('_', '.'))):
                     cat['images'].append({
-                        'full': copy_asset(f, rel_dir),
+                        'full': make_doc_image(f, rel_dir),
                         'alt': parse_name(f.stem)[1],
                     })
         cat['count'] = len(cat['files'])
@@ -427,6 +452,13 @@ TEMPLATE = r'''<!DOCTYPE html>
   .nav-icon{width:18px;text-align:center;flex-shrink:0;font-size:15px}
   .nav-count{margin-left:auto;color:#9ca3af;font-size:12.5px}
   .nav-item.active .nav-count{color:#c2410c}
+  .sidebar-toggle{
+    display:none;position:fixed;top:10px;left:14px;z-index:10000;
+    width:34px;height:34px;border-radius:8px;background:#fff;
+    border:1px solid #eee;align-items:center;justify-content:center;
+    cursor:pointer;font-size:17px;color:#111;box-shadow:0 1px 4px rgba(0,0,0,.1);
+  }
+  .sidebar-toggle:hover{background:#f5f5f5}
 
   /* ---------- Main ---------- */
   .main{padding:30px 40px 60px;max-width:1400px}
@@ -608,14 +640,17 @@ TEMPLATE = r'''<!DOCTYPE html>
   /* ---------- Mobile ---------- */
   @media(max-width:768px){
     .layout{grid-template-columns:1fr}
+    .sidebar-toggle{display:flex}
     .sidebar{
-      position:sticky;top:0;height:auto;padding:10px;display:flex;gap:6px;
-      border-right:none;border-bottom:1px solid #eee;overflow-x:auto;z-index:10;
+      position:fixed;left:0;top:0;width:250px;height:100vh;
+      margin-left:-250px;transition:margin-left .2s;
+      z-index:9999;box-shadow:2px 0 14px rgba(0,0,0,.18);
     }
-    .brand,.sec-label{display:none}
-    .nav-item{flex-shrink:0;margin-bottom:0;padding:8px 14px;white-space:nowrap}
-    .nav-count{margin-left:6px}
-    .main{padding:18px 14px 40px}
+    body.sidebar-open .sidebar{margin-left:0}
+    body.sidebar-open::after{
+      content:'';position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9998;
+    }
+    .main{padding:60px 14px 40px}
     .top-bar{flex-direction:column;align-items:stretch;gap:10px}
     .search{max-width:none;margin-left:0}
     .gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
@@ -629,6 +664,7 @@ TEMPLATE = r'''<!DOCTYPE html>
 </head>
 <body>
 
+<button class="sidebar-toggle" id="sidebarToggle" aria-label="切換選單" title="切換選單">☰</button>
 <div class="layout">
   <aside class="sidebar">
     <div class="brand"><span>🚒</span><span>分隊資訊站</span></div>
@@ -933,6 +969,15 @@ function closeModal() {
 }
 
 /* ---------- Events ---------- */
+$('sidebarToggle').addEventListener('click', () => {
+  document.body.classList.toggle('sidebar-open');
+});
+document.addEventListener('click', e => {
+  if (!document.body.classList.contains('sidebar-open')) return;
+  if (e.target.closest('.sidebar') || e.target.closest('#sidebarToggle')) return;
+  document.body.classList.remove('sidebar-open');
+});
+
 nav.addEventListener('click', e => {
   const el = e.target.closest('.nav-item');
   if (!el) return;
@@ -941,6 +986,7 @@ nav.addEventListener('click', e => {
   currentCat = el.dataset.cat;
   location.hash = encodeURIComponent(currentCat);
   render();
+  document.body.classList.remove('sidebar-open');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
@@ -984,7 +1030,7 @@ modal.addEventListener('click', e => {
   if (e.target === modal) closeModal();
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
+  if (e.key === 'Escape') { closeModal(); document.body.classList.remove('sidebar-open'); }
   if (e.key === '/' && document.activeElement !== $('searchInput')) {
     e.preventDefault();
     $('searchInput').focus();
