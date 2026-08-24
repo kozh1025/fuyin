@@ -14,6 +14,8 @@ content/<區塊>/<類別>/
   gallery  圖片卡片牆。掃描 *.jpg/*.png，同名 .md 為選配的補充資料。
   doc      業務說明頁。_index.md 為內文，files/ 內的檔案成為附件下載區。
   files    純檔案清單。files/ 內的檔案（沒有的話就掃類別資料夾本身）。
+  work     文字範本卡片牆。_index.md 內文用 `## 標題` 切成多張卡，
+           每張卡附一顆「複製文字」按鈕，直接複製該段原始文字。
 
 新增一個業務 = 開一個資料夾，不需要改這支腳本。
 """
@@ -188,6 +190,23 @@ def render_md(text: str) -> str:
     return '\n'.join(out)
 
 
+def parse_works(text: str):
+    """work 型：用 `## 標題` 切段，每段的原始文字整段保留（供直接複製），不跑 inline_md。"""
+    works = []
+    title, buf = None, []
+    for line in text.splitlines():
+        m = re.match(r'^##\s+(.+)', line.strip())
+        if m:
+            if title is not None:
+                works.append({'title': title, 'text': '\n'.join(buf).strip('\n')})
+            title, buf = m.group(1).strip(), []
+        elif title is not None:
+            buf.append(line)
+    if title is not None:
+        works.append({'title': title, 'text': '\n'.join(buf).strip('\n')})
+    return works
+
+
 # --------------------------------------------------------------------------
 # 資產：複製原檔 + 產生縮圖
 # --------------------------------------------------------------------------
@@ -309,11 +328,17 @@ def build_category(sec_slug: str, cat_dir: Path):
         'items': [],
         'files': [],
         'images': [],
+        'works': [],
     }
 
     if ctype == 'gallery':
         cat['items'] = build_gallery(cat_dir, rel_dir, path_id)
         cat['count'] = len(cat['items'])
+    elif ctype == 'work':
+        # work 型：整份 _index.md 用 `## 標題` 切成多個可直接複製文字的項目卡。
+        cat['works'] = parse_works(body)
+        cat['body'] = ''
+        cat['count'] = len(cat['works'])
     else:
         files_dir = cat_dir / 'files'
         if files_dir.exists():
@@ -515,6 +540,17 @@ TEMPLATE = r'''<!DOCTYPE html>
     border:1px solid #eee;border-radius:10px;cursor:zoom-in;
   }
 
+  /* ---------- Work ---------- */
+  .work-list{display:flex;flex-direction:column;gap:16px;max-width:820px}
+  .work-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:20px 24px}
+  .work-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+  .work-card-title{font-size:16px;font-weight:600;color:#111}
+  .work-card-head .btn{flex:none}
+  .work-text{
+    white-space:pre-wrap;word-break:break-word;
+    font-size:14.5px;color:#374151;line-height:1.8;
+  }
+
   /* ---------- Files ---------- */
   .files{margin-top:28px;max-width:820px}
   .files-head{font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:.06em;margin-bottom:10px}
@@ -585,6 +621,8 @@ TEMPLATE = r'''<!DOCTYPE html>
     .gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
     .card-body{padding:12px}
     .doc{padding:22px 18px}
+    .work-card{padding:16px 18px}
+    .work-card-head{flex-wrap:wrap}
     .btn{padding:7px 8px;font-size:12px}
   }
 </style>
@@ -648,7 +686,7 @@ nav.innerHTML = DATA.map(sec => `
     <div class="nav-item" data-cat="${esc(c.id)}">
       <span class="nav-icon">${c.icon || '•'}</span>
       <span>${esc(c.name)}</span>
-      <span class="nav-count">${c.type === 'gallery' && c.count ? c.count : ''}</span>
+      <span class="nav-count">${(c.type === 'gallery' || c.type === 'work') && c.count ? c.count : ''}</span>
     </div>`).join('')}
 `).join('');
 
@@ -686,6 +724,17 @@ function cardHtml(item, i) {
     </div>`;
 }
 
+function workHtml(w) {
+  return `
+    <div class="work-card">
+      <div class="work-card-head">
+        <div class="work-card-title">${esc(w.title)}</div>
+        <button class="btn btn-copy" data-action="copytext" data-text="${esc(w.text)}">📋 複製文字</button>
+      </div>
+      <div class="work-text">${esc(w.text)}</div>
+    </div>`;
+}
+
 function fileChip(f, dark) {
   return `<button class="chip${dark ? ' chip-dark' : ''}" data-action="fileline" data-url="${esc(f.url)}">
     <span class="chip-ext">${esc(f.ext)}</span>
@@ -713,11 +762,14 @@ function filesHtml(files, heading) {
 function renderCategory(cat) {
   pageTitle.textContent = cat.name;
   pageCount.textContent = cat.type === 'gallery' ? `共 ${cat.count} 家` :
+    cat.type === 'work' ? (cat.count ? `${cat.count} 項` : '') :
     cat.count ? `${cat.count} 份文件` : '';
   pageDesc.textContent = cat.desc || '';
 
   if (cat.type === 'gallery') {
     content.innerHTML = `<div class="gallery">${cat.items.map(cardHtml).join('')}</div>`;
+  } else if (cat.type === 'work') {
+    content.innerHTML = `<div class="work-list">${(cat.works || []).map(workHtml).join('')}</div>`;
   } else {
     const imgs = (cat.images || []).map(im =>
       `<img class="doc-image" data-action="docimg" data-full="${im.full}" src="${im.full}" alt="${esc(im.alt)}" loading="lazy">`
@@ -809,6 +861,24 @@ async function copyLink(id, btn) {
   setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '📋 複製連結'; }, 1500);
 }
 
+async function copyText(btn) {
+  const text = btn.dataset.text;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+  const original = btn.textContent;
+  btn.classList.add('copied');
+  btn.textContent = '✓ 已複製';
+  setTimeout(() => { btn.classList.remove('copied'); btn.textContent = original; }, 1500);
+}
+
 function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('show');
@@ -877,6 +947,7 @@ content.addEventListener('click', e => {
   // doc 頁的檔案/圖片不在 .card 內，要在 card 判斷前處理
   if (action === 'fileline') { shareFileLine(trigger.dataset.url); return; }
   if (action === 'docimg') { openImage(trigger.dataset.full, trigger.getAttribute('alt')); return; }
+  if (action === 'copytext') { copyText(trigger); return; }
 
   const card = e.target.closest('.card');
   if (!card) return;
