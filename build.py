@@ -541,14 +541,14 @@ TEMPLATE = r'''<!DOCTYPE html>
   }
 
   /* ---------- Work ---------- */
-  .work-list{display:flex;flex-direction:column;gap:16px;max-width:820px}
-  .work-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:20px 24px}
-  .work-card-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
-  .work-card-title{font-size:16px;font-weight:600;color:#111}
+  .work-list{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:820px}
+  .work-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px 18px}
+  .work-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+  .work-card-title{font-size:15px;font-weight:600;color:#111}
   .work-card-head .btn{flex:none}
   .work-text{
     white-space:pre-wrap;word-break:break-word;
-    font-size:14.5px;color:#374151;line-height:1.8;
+    font-size:13.5px;color:#374151;line-height:1.7;
   }
 
   /* ---------- Files ---------- */
@@ -621,7 +621,7 @@ TEMPLATE = r'''<!DOCTYPE html>
     .gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
     .card-body{padding:12px}
     .doc{padding:22px 18px}
-    .work-card{padding:16px 18px}
+    .work-list{grid-template-columns:1fr}
     .work-card-head{flex-wrap:wrap}
     .btn{padding:7px 8px;font-size:12px}
   }
