@@ -830,9 +830,29 @@ function findItem(id) {
 const shareUrl = id =>
   location.origin + location.pathname + '#' + encodeURIComponent(id);
 
-function shareLine(id) {
+// 傳到 LINE 要傳「這張圖」本身，不是網頁連結：
+// 優先用 Web Share API 把圖片檔案直接叫出分享面板（LINE 收到的就是照片）；
+// 裝置不支援檔案分享時，退回傳圖片的直接網址（至少不是整個網站首頁）。
+async function shareLine(id) {
+  const item = findItem(id);
+  const imgUrl = item ? item.img : null;
+  if (imgUrl) {
+    try {
+      const resp = await fetch(imgUrl);
+      const blob = await resp.blob();
+      const ext = blob.type.includes('png') ? 'png' : 'jpg';
+      const file = new File([blob], `${item.title}.${ext}`, { type: blob.type });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        return;
+      }
+    } catch (err) {
+      if (err && err.name === 'AbortError') return;
+    }
+  }
+  const abs = new URL(imgUrl || shareUrl(id), location.href).href;
   window.open(
-    'https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(shareUrl(id)),
+    'https://social-plugins.line.me/lineit/share?url=' + encodeURIComponent(abs),
     '_blank', 'noopener');
 }
 
