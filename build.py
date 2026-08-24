@@ -426,16 +426,19 @@ TEMPLATE = r'''<!DOCTYPE html>
     color:#1f2937;background:#fafafa;line-height:1.6;
     -webkit-font-smoothing:antialiased;
   }
-  .layout{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+  .layout{display:flex;min-height:100vh}
 
   /* ---------- Sidebar ---------- */
   .sidebar{
+    width:250px;flex-shrink:0;
     background:#fff;border-right:1px solid #eee;
     padding:24px 12px;position:sticky;top:0;height:100vh;overflow-y:auto;
+    transition:margin-left .2s;
   }
+  body.sidebar-toggled .sidebar{margin-left:-250px}
   .brand{
     display:flex;align-items:center;gap:8px;
-    font-size:16px;font-weight:600;color:#111;padding:4px 10px 18px;
+    font-size:16px;font-weight:600;color:#111;padding:44px 10px 18px 10px;
   }
   .sec-label{
     font-size:11px;font-weight:700;color:#9ca3af;
@@ -453,7 +456,7 @@ TEMPLATE = r'''<!DOCTYPE html>
   .nav-count{margin-left:auto;color:#9ca3af;font-size:12.5px}
   .nav-item.active .nav-count{color:#c2410c}
   .sidebar-toggle{
-    display:none;position:fixed;top:10px;left:14px;z-index:10000;
+    display:flex;position:fixed;top:10px;left:14px;z-index:10000;
     width:34px;height:34px;border-radius:8px;background:#fff;
     border:1px solid #eee;align-items:center;justify-content:center;
     cursor:pointer;font-size:17px;color:#111;box-shadow:0 1px 4px rgba(0,0,0,.1);
@@ -461,7 +464,7 @@ TEMPLATE = r'''<!DOCTYPE html>
   .sidebar-toggle:hover{background:#f5f5f5}
 
   /* ---------- Main ---------- */
-  .main{padding:30px 40px 60px;max-width:1400px}
+  .main{flex:1;min-width:0;padding:30px 40px 60px;max-width:1400px}
   .top-bar{display:flex;align-items:center;gap:16px;margin-bottom:8px}
   .page-title{font-size:22px;font-weight:600;color:#111;display:flex;align-items:baseline;gap:10px}
   .page-title .count{font-size:14px;color:#9ca3af;font-weight:400}
@@ -639,15 +642,14 @@ TEMPLATE = r'''<!DOCTYPE html>
 
   /* ---------- Mobile ---------- */
   @media(max-width:768px){
-    .layout{grid-template-columns:1fr}
-    .sidebar-toggle{display:flex}
+    .layout{display:block}
     .sidebar{
       position:fixed;left:0;top:0;width:250px;height:100vh;
-      margin-left:-250px;transition:margin-left .2s;
+      margin-left:-250px;
       z-index:9999;box-shadow:2px 0 14px rgba(0,0,0,.18);
     }
-    body.sidebar-open .sidebar{margin-left:0}
-    body.sidebar-open::after{
+    body.sidebar-toggled .sidebar{margin-left:0 !important}
+    body.sidebar-toggled::after{
       content:'';position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9998;
     }
     .main{padding:60px 14px 40px}
@@ -969,13 +971,17 @@ function closeModal() {
 }
 
 /* ---------- Events ---------- */
+// class 意思隨螢幕寬度反過來：手機預設收起、桌機預設展開，
+// 所以「離開/關閉」用的收合動作一律只在手機寬度生效，避免桌機被意外收合又跳開。
+const isMobileWidth = () => window.matchMedia('(max-width:768px)').matches;
+
 $('sidebarToggle').addEventListener('click', () => {
-  document.body.classList.toggle('sidebar-open');
+  document.body.classList.toggle('sidebar-toggled');
 });
 document.addEventListener('click', e => {
-  if (!document.body.classList.contains('sidebar-open')) return;
+  if (!isMobileWidth() || !document.body.classList.contains('sidebar-toggled')) return;
   if (e.target.closest('.sidebar') || e.target.closest('#sidebarToggle')) return;
-  document.body.classList.remove('sidebar-open');
+  document.body.classList.remove('sidebar-toggled');
 });
 
 nav.addEventListener('click', e => {
@@ -986,7 +992,7 @@ nav.addEventListener('click', e => {
   currentCat = el.dataset.cat;
   location.hash = encodeURIComponent(currentCat);
   render();
-  document.body.classList.remove('sidebar-open');
+  if (isMobileWidth()) document.body.classList.remove('sidebar-toggled');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
@@ -1030,7 +1036,7 @@ modal.addEventListener('click', e => {
   if (e.target === modal) closeModal();
 });
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); document.body.classList.remove('sidebar-open'); }
+  if (e.key === 'Escape') { closeModal(); if (isMobileWidth()) document.body.classList.remove('sidebar-toggled'); }
   if (e.key === '/' && document.activeElement !== $('searchInput')) {
     e.preventDefault();
     $('searchInput').focus();
