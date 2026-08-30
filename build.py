@@ -210,6 +210,26 @@ def parse_works(text: str):
     return works
 
 
+def extract_copy_blocks(text: str):
+    """doc/files 型內文可用 `## 📋 標題` 標記一段可直接複製文字的卡片（放在頁面最上面）。
+    回傳 (卡片清單, 拿掉這些區塊後剩下的內文)，剩下的內文照樣跑 render_md。"""
+    works, body_lines = [], []
+    lines, i = text.splitlines(), 0
+    while i < len(lines):
+        m = re.match(r'^##\s+📋\s*(.+)', lines[i].strip())
+        if not m:
+            body_lines.append(lines[i])
+            i += 1
+            continue
+        title, buf = m.group(1).strip(), []
+        i += 1
+        while i < len(lines) and not re.match(r'^#{1,4}\s+', lines[i].strip()):
+            buf.append(lines[i])
+            i += 1
+        works.append({'title': title, 'text': '\n'.join(buf).strip('\n')})
+    return works, '\n'.join(body_lines)
+
+
 # --------------------------------------------------------------------------
 # 資產：複製原檔 + 產生縮圖
 # --------------------------------------------------------------------------
@@ -365,6 +385,9 @@ def build_category(sec_slug: str, cat_dir: Path):
         cat['body'] = ''
         cat['count'] = len(cat['works'])
     else:
+        # `## 📋 標題` 區塊抽成可複製文字卡，顯示在頁面最上面；剩下的內文才跑一般 markdown。
+        cat['works'], rest_body = extract_copy_blocks(body)
+        cat['body'] = render_md(rest_body)
         files_dir = cat_dir / 'files'
         if files_dir.exists():
             cat['files'] = collect_files(files_dir, f'{rel_dir}/files')
@@ -811,12 +834,14 @@ function renderCategory(cat) {
     const imgs = (cat.images || []).map(im =>
       `<img class="doc-image" data-action="docimg" data-full="${im.full}" src="${im.full}" alt="${esc(im.alt)}" loading="lazy">`
     ).join('');
+    const works = (cat.works || []).length ? `<div class="work-list">${cat.works.map(workHtml).join('')}</div>` : '';
     content.innerHTML =
+      works +
       (cat.body ? `<div class="doc">${cat.body}</div>` : '') +
       (imgs ? `<div class="doc-images">${imgs}</div>` : '') +
       filesHtml(cat.files, '傳到 LINE');
   }
-  empty.style.display = (cat.count || cat.body || (cat.images && cat.images.length)) ? 'none' : 'block';
+  empty.style.display = (cat.count || cat.body || (cat.images && cat.images.length) || (cat.works && cat.works.length)) ? 'none' : 'block';
 }
 
 function renderSearch(q) {
