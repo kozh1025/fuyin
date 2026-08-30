@@ -755,7 +755,6 @@ function cardHtml(item, i) {
         ${files.length
           ? `<div class="card-files">${files.map(f => fileChip(f)).join('')}</div>`
           : `<div class="card-actions">
-          <button class="btn btn-copy" data-action="copy">📋 複製連結</button>
           <button class="btn btn-line" data-action="line">傳到 LINE</button>
         </div>`}
       </div>
@@ -902,23 +901,6 @@ function shareFileLine(relUrl) {
     '_blank', 'noopener');
 }
 
-async function copyLink(id, btn) {
-  const url = shareUrl(id);
-  try {
-    await navigator.clipboard.writeText(url);
-  } catch {
-    const ta = document.createElement('textarea');
-    ta.value = url;
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    ta.remove();
-  }
-  btn.classList.add('copied');
-  btn.textContent = '✓ 已複製';
-  setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '📋 複製連結'; }, 1500);
-}
-
 async function copyText(btn) {
   const text = btn.dataset.text;
   try {
@@ -1026,7 +1008,6 @@ content.addEventListener('click', e => {
   const id = card.dataset.id;
   if (action === 'zoom') openModal(id);
   else if (action === 'line') shareLine(id);
-  else if (action === 'copy') copyLink(id, trigger);
 });
 
 $('modalClose').addEventListener('click', closeModal);
