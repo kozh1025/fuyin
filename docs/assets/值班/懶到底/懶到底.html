@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>懶到底</title>
+<style>
+:root {
+  --bg:    #0a0907;
+  --card:  #131109;
+  --line:  #26200f;
+  --gold:  #c8923a;
+  --gold2: #e8b55a;
+  --glow:  rgba(200,146,58,.14);
+  --text:  #f0e8d8;
+  --muted: #7a6e5e;
+  --done:  #3a3020;
+  --red:   #c0392b;
+  --r:     13px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+     background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--gold)}
+
+.wrap{max-width:1100px;margin:auto;padding:24px 18px}
+
+/* ── Quick links bar ── */
+.quick-links{
+  display:flex;gap:10px;flex-wrap:wrap;
+  margin-bottom:16px;
+  padding:12px 14px;
+  background:var(--card);
+  border:1px solid var(--gold);
+  border-radius:14px;
+  box-shadow:0 0 16px var(--glow);
+}
+.quick-links a{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:7px 14px;border-radius:9px;
+  border:1px solid var(--line);background:var(--bg);
+  color:var(--gold);font-size:13px;font-weight:600;
+  text-decoration:none;transition:border-color .15s,box-shadow .15s;
+  white-space:nowrap;
+}
+.quick-links a:hover{border-color:var(--gold);box-shadow:0 0 10px var(--glow)}
+.quick-links-label{
+  font-size:11px;color:var(--muted);align-self:center;
+  padding-right:4px;white-space:nowrap;
+}
+
+/* ── Top bar ── */
+.top{display:flex;align-items:center;margin-bottom:18px}
+.top > div { flex:1; }
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;
+      letter-spacing:.3px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--gold);
+     animation:pulse 1.8s infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+.sync{font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:#4caf50}
+.sync-dot.off{background:var(--red)}
+.clock{color:var(--gold);font-size:32px;font-weight:700;letter-spacing:1px;display:block;text-align:center;}
+
+/* ── Time slots ── */
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:18px}
+.slot{background:var(--card);border:1px solid var(--line);padding:11px 6px;
+      border-radius:var(--r);text-align:center;cursor:pointer;font-size:13px;
+      transition:border-color .18s,box-shadow .18s;user-select:none}
+.slot.active{border-color:var(--gold);box-shadow:inset 0 -3px 0 var(--gold),
+             0 0 12px var(--glow);color:var(--gold);font-weight:700}
+.slot:hover:not(.active){border-color:#3a3020}
+
+/* ── Panels ── */
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:var(--card);border:1px solid var(--line);
+      border-radius:18px;padding:18px}
+.card-title{font-size:16px;font-weight:700;margin-bottom:14px;
+            display:flex;align-items:center;gap:8px;color:var(--text)}
+.card-title small{font-size:11px;font-weight:400;color:var(--muted)}
+
+/* ── Input row ── */
+.add-row{display:flex;gap:8px}
+.add-row textarea{
+  flex:1;padding:9px 12px;border-radius:9px;
+  border:1px solid var(--line);background:var(--bg);
+  color:var(--text);font-size:14px;outline:none;
+  transition:border-color .15s;resize:vertical;min-height:38px;height:38px;font-family:inherit;line-height:1.4;overflow:hidden;}
+.add-row textarea:focus{border-color:var(--gold)}
+.add-btn{
+  padding:9px 15px;border:0;border-radius:9px;
+  background:var(--gold);cursor:pointer;font-weight:700;
+  color:#110900;font-size:14px;white-space:nowrap;transition:opacity .15s}
+.add-btn:hover{opacity:.82}
+
+/* ── List ── */
+.list{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+
+/* ── Task item ── */
+.item{display:flex;align-items:center;gap:10px;padding:9px 11px;
+      border:1px solid var(--line);border-radius:11px;
+      background:transparent;transition:opacity .2s}
+.item.done-item{opacity:.48}
+
+/* pinned task */
+.item.pinned{border-color:#2a2010;background:rgba(200,146,58,.05)}
+.pin-icon{font-size:12px;flex-shrink:0;opacity:.5}
+
+/* circle checkbox */
+.check{width:21px;height:21px;border-radius:50%;border:2px solid var(--muted);
+       cursor:pointer;flex-shrink:0;display:flex;align-items:center;
+       justify-content:center;transition:background .12s,border-color .12s}
+.check.checked{background:var(--gold);border-color:var(--gold)}
+.check.checked::after{content:'✓';font-size:11px;color:#110900;font-weight:900}
+.check:hover:not(.checked){border-color:var(--gold)}
+
+.item-text{flex:1;font-size:14px;line-height:1.5;word-break:break-all;white-space:pre-wrap}
+.item-text.done-text{text-decoration:line-through;color:var(--done)}
+.item-text a{color:var(--gold)}
+
+.del-btn{width:30px;height:30px;border:0;border-radius:50%;
+         background:transparent;color:var(--muted);cursor:pointer;
+         font-size:19px;line-height:1;display:flex;align-items:center;
+         justify-content:center;flex-shrink:0;padding-bottom:1px;
+         transition:background .12s,color .12s}
+.del-btn:hover{background:rgba(192,57,43,.18);color:var(--red)}
+
+/* pinned divider */
+.pinned-divider{display:none}
+
+/* ── Setup overlay ── */
+#setupOverlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.75);
+  display:flex;align-items:center;justify-content:center;
+  z-index:100;padding:20px}
+.setup-box{
+  background:#131109;border:1px solid var(--gold);border-radius:20px;
+  padding:28px 30px;max-width:520px;width:100%}
+.setup-box h2{color:var(--gold);font-size:18px;margin-bottom:6px}
+.setup-box p{color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:14px}
+.setup-box a{color:var(--gold2)}
+.setup-box textarea{
+  width:100%;height:130px;padding:10px 12px;border-radius:9px;
+  border:1px solid var(--line);background:var(--bg);color:var(--text);
+  font-size:12px;font-family:monospace;resize:vertical;outline:none;
+  transition:border-color .15s}
+.setup-box textarea:focus{border-color:var(--gold)}
+.setup-btns{display:flex;gap:10px;margin-top:12px}
+.setup-ok{
+  flex:1;padding:10px;border:0;border-radius:9px;background:var(--gold);
+  color:#110900;font-weight:700;font-size:14px;cursor:pointer;transition:opacity .15s}
+.setup-ok:hover{opacity:.82}
+.setup-skip{
+  padding:10px 16px;border:1px solid var(--line);border-radius:9px;
+  background:transparent;color:var(--muted);font-size:14px;cursor:pointer}
+.setup-skip:hover{border-color:var(--gold);color:var(--gold)}
+
+/* ── Sync strip ── */
+#syncStrip{font-size:11px;color:var(--muted);text-align:right;
+           margin-bottom:10px;min-height:16px}
+
+/* ── Empty state ── */
+.empty{text-align:center;color:var(--muted);font-size:13px;padding:20px 0}
+
+@media(max-width:700px){
+  .grid{grid-template-columns:1fr 1fr}
+  .panels{grid-template-columns:1fr}
+  .quick-links{gap:8px}
+}
+</style>
+</head>
+<body>
+
+<!-- Firebase setup overlay -->
+<div id="setupOverlay" style="display:none">
+  <div class="setup-box">
+    <h2>🔥 設定 Firebase 即時同步</h2>
+    <p>
+      貼上你的 Firebase 設定，即可跨裝置同步資料。<br>
+      前往
+      <a href="https://console.firebase.google.com/project/kozh-5f47a/settings/general"
+         target="_blank">Firebase Console → 專案設定 → 你的應用程式</a>，
+      複製 <strong style="color:var(--gold2)">firebaseConfig</strong> 物件貼到下方。<br>
+      <small style="opacity:.6">也可以點「稍後再說」以本機模式使用。</small>
+    </p>
+    <textarea id="configInput" placeholder='{
+  "apiKey": "AIza...",
+  "authDomain": "kozh-5f47a.firebaseapp.com",
+  "databaseURL": "https://kozh-5f47a-default-rtdb.firebaseio.com",
+  "projectId": "kozh-5f47a",
+  "storageBucket": "kozh-5f47a.appspot.com",
+  "messagingSenderId": "...",
+  "appId": "..."
+}'></textarea>
+    <div class="setup-btns">
+      <button class="setup-ok" onclick="applyConfig()">✓ 儲存並連線</button>
+      <button class="setup-skip" onclick="skipConfig()">稍後再說</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div id="syncStrip"></div>
+
+  <div class="top">
+    <div style="flex:1;display:flex;align-items:center;">
+      <div class="logo">
+        <span class="dot"></span>
+        懶到底
+        <span class="sync" id="syncBadge"></span>
+      </div>
+    </div>
+    <div style="flex:1;">
+      <span class="clock" id="clock"></span>
+    </div>
+    <div style="flex:1;"></div>
+  </div>
+
+  <div class="grid" id="slots"></div>
+
+  <!-- ── 常用連結 ── -->
+  <div class="quick-links" style="margin-bottom:14px">
+    <span class="quick-links-label">🔗 常用</span>
+    <a href="http://cloud2.ntpc.gov.tw/" target="_blank" rel="noopener">☁️ 公務雲</a>
+    <a href="https://119web.tpf.gov.tw:8011/Case/DispatchList.aspx" target="_blank" rel="noopener">🚑 派遣系統</a>
+    <a href="https://ifs.ntpc.gov.tw/Login.aspx?ReturnUrl=%2f" target="_blank" rel="noopener">📋 智能值班台</a>
+  </div>
+
+  <div class="panels">
+    <section class="card">
+      <h2 class="card-title">
+        時段任務
+        <small>每日 08:00 重置</small>
+      </h2>
+      <div class="add-row">
+        <textarea id="taskInput" placeholder="新增任務…" rows="1"
+               oninput="this.style.height='38px';this.style.height=this.scrollHeight+'px'"
+               onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();addTask();}"></textarea>
+        <button class="add-btn" onclick="addTask()">新增</button>
+      </div>
+      <div class="list" id="taskList"></div>
+    </section>
+
+    <section class="card">
+      <h2 class="card-title">尚未完成</h2>
+      <div class="add-row">
+        <textarea id="backlogInput" placeholder="新增待辦…" rows="1"
+               oninput="this.style.height='38px';this.style.height=this.scrollHeight+'px'"
+               onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault();addBacklog();}"></textarea>
+        <button class="add-btn" onclick="addBacklog()">新增</button>
+      </div>
+      <div class="list" id="backlogList"></div>
+    </section>
+  </div>
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// Storage keys
+// ═══════════════════════════════════════════════════════════════
+const STORAGE_KEY = 'wh_state_v3';
+const CONFIG_KEY  = 'wh_firebase_cfg';
+
+// Firebase 設定
+const KNOWN_CFG = {
+  apiKey:            'AIzaSyCc2K_lRhugslJUx3tq3ziNa42Y10Smq5Y',
+  authDomain:        'kozh-5f47a.firebaseapp.com',
+  databaseURL:       'https://kozh-5f47a-default-rtdb.firebaseio.com',
+  projectId:         'kozh-5f47a',
+  storageBucket:     'kozh-5f47a.firebasestorage.app',
+  messagingSenderId: '1035695178280',
+  appId:             '1:1035695178280:web:5e99c751933c44cdbc6b1d',
+  measurementId:     'G-G5R9EWBPWH'
+};
+
+// ── 常駐任務（每日重置勾選狀態，不可刪除）────────────────────
+// key = 時段 index: 0=08-12, 1=12-16, 2=16-18, 3=18-22, 4=22-08
+const PINNED_TASKS = {
+  0: [
+    'http://118.163.107.94/epcr/login.aspx 帳號:B03  密碼:29032119',
+    '救護車行車記錄器影像',
+    '前一天的出勤檢核',
+    '裝備點檢表',
+    '無線電測試'
+  ],
+  1: [
+    '登打勤務表丟二大、丟分隊群組',
+    '檢查住警器、水源、安管系統截圖群組',
+    '綁定無線電',
+    '1450 廣播環境整理、收拾垃圾、1510 集合常訓'
+  ],
+  2: [
+    '核對勤務表',
+    '17:00 登打智能值班台【常訓工作】',
+    '檢查火搶系統～截圖群組',
+    '18:00 開車庫燈'
+  ],
+  3: [
+    '密錄器影像複製'
+  ],
+  4: [
+    '23:00 廣播拿點餐盤',
+    '00:00 關閉地下室鐵捲門',
+    '07:00 打開鐵捲門',
+    '07:50 廣播第一天上班8點集合'
+  ]
+};
+
+// ── State ────────────────────────────────────────────────────────
+const LABELS = ['08–12','12–16','16–18','18–22','22–08'];
+let active  = 0;
+let dbRef   = null;
+let saving  = false;
+let autoSlotTimeout = 0;
+
+// pinnedDone[slotIndex][taskIndex] = true/false
+let pinnedDone = {};
+
+let state = {
+  tasks:         [[], [], [], [], []],
+  backlog:       [],
+  lastResetDate: ''
+};
+
+// 每日預設任務範本
+const WEEKLY_ROUTINE = {};
+
+// ── Helpers ──────────────────────────────────────────────────────
+const $   = id => document.getElementById(id);
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+function todayKey() {
+  const n = new Date(), d = new Date(n);
+  if (n.getHours() < 8) d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0,10);
+}
+
+function esc(t) {
+  let s = t.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  return s.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+}
+
+// ── 常駐任務狀態 ──────────────────────────────────────────────────
+const PINNED_KEY = 'wh_pinned_v1';
+
+function loadPinned() {
+  try {
+    const raw = localStorage.getItem(PINNED_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data.date === todayKey()) {
+        pinnedDone = data.done || {};
+        return;
+      }
+    }
+  } catch(e) {}
+  // 新的一天：重置所有常駐任務勾選
+  pinnedDone = {};
+  savePinned();
+}
+
+function savePinned() {
+  try {
+    localStorage.setItem(PINNED_KEY, JSON.stringify({ date: todayKey(), done: pinnedDone }));
+  } catch(e) {}
+}
+
+function togglePinned(slot, idx) {
+  if (!pinnedDone[slot]) pinnedDone[slot] = {};
+  pinnedDone[slot][idx] = !pinnedDone[slot][idx];
+  savePinned();
+  render();
+}
+
+// ── Daily reset ──────────────────────────────────────────────────
+function checkReset() {
+  const key = todayKey();
+  if (state.lastResetDate === key) return;
+  const ids = new Set((state.backlog||[]).map(b => b.id));
+  for (let i = 0; i < 5; i++) {
+    (state.tasks[i] || []).forEach(t => {
+      if (!t.done && !ids.has(t.id)) {
+        state.backlog.push({ id: t.id, text: t.text });
+        ids.add(t.id);
+      }
+    });
+    state.tasks[i] = [];
+  }
+
+  const dayOfWeek = (new Date()).getDay();
+  const todayRoutine = WEEKLY_ROUTINE[dayOfWeek];
+  if (todayRoutine) {
+    for (let slot in todayRoutine) {
+      if (todayRoutine[slot]) {
+        state.tasks[slot] = todayRoutine[slot].map(text => ({
+          id: uid(), text, done: false
+        }));
+      }
+    }
+  }
+
+  state.lastResetDate = key;
+}
+
+// ── Persist ──────────────────────────────────────────────────────
+function saveLocal() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (Array.isArray(s.tasks) && s.tasks.length === 5) state.tasks = s.tasks;
+      if (Array.isArray(s.backlog)) state.backlog = s.backlog;
+      if (s.lastResetDate) state.lastResetDate = s.lastResetDate;
+    }
+  } catch(e) {}
+}
+
+function saveState() {
+  saveLocal();
+  if (!dbRef || saving) return;
+  saving = true;
+  dbRef.set({ json: JSON.stringify(state) })
+    .catch(() => {})
+    .finally(() => { saving = false; });
+}
+
+// ── Setup overlay ─────────────────────────────────────────────────
+function showSetup() { $('setupOverlay').style.display = 'flex'; }
+function skipConfig() { $('setupOverlay').style.display = 'none'; }
+
+function applyConfig() {
+  let raw = $('configInput').value.trim();
+  raw = raw.replace(/^\s*(const|var|let)\s+\w+\s*=\s*/, '').replace(/;\s*$/, '');
+  let cfg = {};
+  try {
+    cfg = JSON.parse(raw);
+  } catch(e) {
+    try {
+      const j = raw
+        .replace(/\/\/[^\n]*/g, '')
+        .replace(/,\s*([\]}])/g, '$1')
+        .replace(/([{,]\s*)(\w+)\s*:/g, '$1"$2":')
+        .replace(/:\s*'([^']*)'/g, ': "$1"');
+      cfg = JSON.parse(j);
+    } catch(e2) {
+      alert('格式有誤，請直接複製 Firebase Console 裡的 firebaseConfig 物件。');
+      return;
+    }
+  }
+  if (!cfg.apiKey) { alert('找不到 apiKey，請確認貼上的內容完整。'); return; }
+  const merged = Object.assign({}, KNOWN_CFG, cfg);
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(merged));
+  $('setupOverlay').style.display = 'none';
+  location.reload();
+}
+
+// ── Firebase init ─────────────────────────────────────────────────
+function initFirebase() {
+  let cfg = KNOWN_CFG;
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved && saved.apiKey) cfg = saved;
+    }
+  } catch(e) {}
+
+  if (!cfg || !cfg.apiKey) {
+    setBadge('local');
+    $('syncStrip').innerHTML =
+      '<span style="color:var(--gold);cursor:pointer;opacity:.8" onclick="showSetup()">' +
+      '⚡ 點此設定 Firebase 即時同步</span>';
+    return;
+  }
+
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    const database = firebase.database();
+    dbRef = database.ref('state');
+
+    dbRef.on('value', snap => {
+      const val = snap.val();
+      if (!val || !val.json) return;
+      try {
+        const remote = JSON.parse(val.json);
+        if (Array.isArray(remote.tasks) && remote.tasks.length === 5) state.tasks = remote.tasks;
+        if (Array.isArray(remote.backlog)) state.backlog = remote.backlog;
+        if (remote.lastResetDate) state.lastResetDate = remote.lastResetDate;
+        checkReset();
+        saveLocal();
+        render();
+        setBadge('on');
+        $('syncStrip').textContent = '';
+      } catch(e) {}
+    });
+
+    database.ref('.info/connected').on('value', snap => {
+      setBadge(snap.val() ? 'on' : 'err');
+    });
+
+  } catch(e) {
+    console.warn('Firebase init error:', e);
+    setBadge('err');
+  }
+}
+
+function setBadge(mode) {
+  const el = $('syncBadge');
+  if (mode === 'on')
+    el.innerHTML = '<span class="sync-dot"></span> 即時同步';
+  else if (mode === 'err')
+    el.innerHTML = '<span class="sync-dot off"></span> 連線失敗';
+  else
+    el.innerHTML = '<span class="sync-dot off"></span> 本機';
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function render() {
+  $('slots').innerHTML = LABELS.map((l,i) =>
+    `<div class="slot${i===active?' active':''}" onclick="setSlot(${i})">${l}</div>`
+  ).join('');
+
+  // 常駐任務（置頂）
+  const pinned = PINNED_TASKS[active] || [];
+  let pinnedHTML = '';
+  if (pinned.length) {
+    pinnedHTML = '<div class="pinned-divider">📌 常駐</div>';
+    pinnedHTML += pinned.map((text, idx) => {
+      const done = !!(pinnedDone[active] && pinnedDone[active][idx]);
+      return `
+        <div class="item pinned${done?' done-item':''}">
+          <div class="check${done?' checked':''}" onclick="togglePinned(${active},${idx})"></div>
+          <div class="item-text${done?' done-text':''}">${esc(text)}</div>
+        </div>`;
+    }).join('');
+    pinnedHTML += '<div class="pinned-divider" style="margin-top:10px">一般任務</div>';
+  }
+
+  const tasks = state.tasks[active] || [];
+  const tasksHTML = tasks.length
+    ? tasks.map((t,i) => `
+      <div class="item${t.done?' done-item':''}">
+        <div class="check${t.done?' checked':''}" onclick="toggleTask(${i})"></div>
+        <div class="item-text${t.done?' done-text':''}">${esc(t.text)}</div>
+        <button class="del-btn" onclick="deleteTask(${i})">×</button>
+      </div>`).join('')
+    : '<div class="empty">此時段尚無任務</div>';
+
+  $('taskList').innerHTML = pinnedHTML + tasksHTML;
+
+  $('backlogList').innerHTML = state.backlog.length
+    ? state.backlog.map((b,i) => `
+      <div class="item">
+        <div class="item-text">${esc(b.text)}</div>
+        <button class="del-btn" onclick="deleteBacklog(${i})">×</button>
+      </div>`).join('')
+    : '<div class="empty">沒有待完成的事項</div>';
+}
+
+// ── Actions ───────────────────────────────────────────────────────
+function setSlot(i) {
+  active = i;
+  autoSlotTimeout = Date.now() + 30000;
+  render();
+}
+
+function addTask() {
+  const el = $('taskInput'), text = el.value.trim();
+  if (!text) return;
+  if (!Array.isArray(state.tasks[active])) state.tasks[active] = [];
+  state.tasks[active].unshift({ id: uid(), text, done: false });
+  el.value = '';
+  if(el.tagName === 'TEXTAREA') el.style.height = '38px';
+  saveState(); render();
+}
+
+function toggleTask(i) {
+  state.tasks[active][i].done = !state.tasks[active][i].done;
+  saveState(); render();
+}
+
+function deleteTask(i) {
+  state.tasks[active].splice(i, 1);
+  saveState(); render();
+}
+
+function addBacklog() {
+  const el = $('backlogInput'), text = el.value.trim();
+  if (!text) return;
+  state.backlog.unshift({ id: uid(), text });
+  el.value = '';
+  if(el.tagName === 'TEXTAREA') el.style.height = '38px';
+  saveState(); render();
+}
+
+function deleteBacklog(i) {
+  state.backlog.splice(i, 1);
+  saveState(); render();
+}
+
+// ── Clock + auto slot ─────────────────────────────────────────────
+function tick() {
+  const n = new Date();
+  const m = String(n.getMonth() + 1).padStart(2, '0');
+  const d = String(n.getDate()).padStart(2, '0');
+  const time = n.toLocaleTimeString('zh-TW', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  $('clock').textContent = `${m}-${d} ${time}`;
+  const h = n.getHours();
+  const slot = (h >= 22 || h < 8) ? 4 : h < 12 ? 0 : h < 16 ? 1 : h < 18 ? 2 : 3;
+  if (slot !== active && Date.now() > autoSlotTimeout) {
+    active = slot;
+    render();
+  }
+}
+
+// ── Boot ──────────────────────────────────────────────────────────
+loadLocal();
+loadPinned();
+checkReset();
+render();
+initFirebase();
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

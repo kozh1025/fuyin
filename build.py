@@ -16,6 +16,11 @@ content/<區塊>/<類別>/
   files    純檔案清單。files/ 內的檔案（沒有的話就掃類別資料夾本身）。
   work     文字範本卡片牆。_index.md 內文用 `## 標題` 切成多張卡，
            每張卡附一顆「複製文字」按鈕，直接複製該段原始文字。
+  embed    整頁嵌入。_index.md 寫 src: 檔名，把資料夾內那支獨立網頁
+           （例如懶到底）用 iframe 嵌在內容區，不跳頁、程式碼也不用合併。
+
+區塊資料夾的 _index.md 可寫 hide_label: true，側欄就不顯示該區塊小標題
+（用來把單一項目直接貼在側欄最上面）。
 
 新增一個業務 = 開一個資料夾，不需要改這支腳本。
 """
@@ -374,6 +379,7 @@ def build_category(sec_slug: str, cat_dir: Path):
         'files': [],
         'images': [],
         'works': [],
+        'embed': '',
     }
 
     if ctype == 'gallery':
@@ -384,6 +390,15 @@ def build_category(sec_slug: str, cat_dir: Path):
         cat['works'] = parse_works(body)
         cat['body'] = ''
         cat['count'] = len(cat['works'])
+    elif ctype == 'embed':
+        # embed 型：把資料夾內一支獨立的網頁（src: 檔名）整頁嵌在內容區，
+        # 用來把懶到底這種自己有 JS/資料庫的小 app 併進站內，不跳頁也不混程式碼。
+        src_name = meta.get('src', '')
+        src = cat_dir / src_name
+        if not src_name or not src.is_file():
+            raise SystemExit(f'{cat_dir / "_index.md"} 的 type: embed 需要 src: 指到資料夾內的網頁檔')
+        cat['embed'] = copy_asset(src, rel_dir)
+        cat['count'] = 0
     else:
         # `## 📋 標題` 區塊抽成可複製文字卡，顯示在頁面最上面；剩下的內文才跑一般 markdown。
         cat['works'], rest_body = extract_copy_blocks(body)
@@ -421,12 +436,14 @@ def scan():
         smeta, _ = read_md(sec_dir / '_index.md')
         sec_slug = smeta.get('title', sec_name)
         cats = [build_category(sec_slug, c) for c in sorted_dirs(sec_dir)]
-        cats = [c for c in cats if c['count'] or c['body'] or c['images']]
+        cats = [c for c in cats if c['count'] or c['body'] or c['images'] or c['embed']]
         if cats:
             sections.append({
                 'id': sec_slug,
                 'name': sec_slug,
                 'icon': smeta.get('icon', ''),
+                # hide_label: true → 側欄不顯示這個區塊的小標題，項目直接貼在最上面
+                'hideLabel': smeta.get('hide_label', '').lower() == 'true',
                 'categories': cats,
             })
     return sections
@@ -598,6 +615,12 @@ TEMPLATE = r'''<!DOCTYPE html>
     border:1px solid #eee;border-radius:10px;cursor:zoom-in;
   }
 
+  /* ---------- Embed（整頁嵌入的小 app）---------- */
+  .embed-frame{
+    display:block;width:100%;height:calc(100vh - 150px);min-height:520px;
+    border:1px solid #eee;border-radius:12px;background:#0a0907;
+  }
+
   /* ---------- Work ---------- */
   .work-list{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:820px}
   .work-card{background:#fff;border:1px solid #eee;border-radius:12px;padding:16px 18px}
@@ -681,6 +704,7 @@ TEMPLATE = r'''<!DOCTYPE html>
     .gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
     .card-body{padding:12px}
     .doc{padding:22px 18px}
+    .embed-frame{height:calc(100vh - 215px);min-height:420px}
     .work-list{grid-template-columns:1fr}
     .work-card-head{flex-wrap:wrap}
     .btn{padding:7px 8px;font-size:12px}
@@ -742,7 +766,7 @@ const esc = s => String(s).replace(/[&<>"']/g, c =>
 
 /* ---------- Sidebar ---------- */
 nav.innerHTML = DATA.map(sec => `
-  <div class="sec-label">${esc(sec.name)}</div>
+  ${sec.hideLabel ? '' : `<div class="sec-label">${esc(sec.name)}</div>`}
   ${sec.categories.map(c => `
     <div class="nav-item" data-cat="${esc(c.id)}">
       <span class="nav-icon">${c.icon || '•'}</span>
@@ -830,6 +854,8 @@ function renderCategory(cat) {
     content.innerHTML = `<div class="gallery">${cat.items.map(cardHtml).join('')}</div>`;
   } else if (cat.type === 'work') {
     content.innerHTML = `<div class="work-list">${(cat.works || []).map(workHtml).join('')}</div>`;
+  } else if (cat.type === 'embed') {
+    content.innerHTML = `<iframe class="embed-frame" src="${cat.embed}" title="${esc(cat.name)}"></iframe>`;
   } else {
     const imgs = (cat.images || []).map(im =>
       `<img class="doc-image" data-action="docimg" data-full="${im.full}" src="${im.full}" alt="${esc(im.alt)}" loading="lazy">`
@@ -841,7 +867,7 @@ function renderCategory(cat) {
       (imgs ? `<div class="doc-images">${imgs}</div>` : '') +
       filesHtml(cat.files, '傳到 LINE');
   }
-  empty.style.display = (cat.count || cat.body || (cat.images && cat.images.length) || (cat.works && cat.works.length)) ? 'none' : 'block';
+  empty.style.display = (cat.count || cat.body || cat.embed || (cat.images && cat.images.length) || (cat.works && cat.works.length)) ? 'none' : 'block';
 }
 
 function renderSearch(q) {
