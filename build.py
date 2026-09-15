@@ -1116,6 +1116,37 @@ function applyHash() {
 
 applyHash();
 window.addEventListener('hashchange', applyHash);
+
+/* ---------- 閒置自動回首頁 ---------- */
+// 5 分鐘沒碰網站就回到側欄第一頁（懶到底），共用的平板/螢幕放著不管也會停在值班頁。
+// 用時間戳而不是單一 setTimeout：背景分頁的計時器會被瀏覽器拖慢，切回來時立刻補判斷。
+const HOME_CAT = DATA[0]?.categories[0]?.id || '';
+const IDLE_MS  = 5 * 60 * 1000;
+let lastActivity = Date.now();
+
+function goHome() {
+  closeModal();
+  document.body.classList.remove('sidebar-toggled');
+  currentQuery = '';
+  $('searchInput').value = '';
+  currentCat = HOME_CAT;
+  if (decodeURIComponent(location.hash.slice(1)) !== HOME_CAT) {
+    history.replaceState(null, '', '#' + encodeURIComponent(HOME_CAT));
+  }
+  render();
+  window.scrollTo({ top: 0 });
+}
+
+function checkIdle() {
+  if (Date.now() - lastActivity < IDLE_MS) return;
+  lastActivity = Date.now();
+  if (currentQuery || currentCat !== HOME_CAT || modal.classList.contains('open')) goHome();
+}
+
+['pointerdown', 'keydown', 'touchstart', 'scroll', 'wheel', 'input', 'mousemove'].forEach(ev =>
+  document.addEventListener(ev, () => { lastActivity = Date.now(); }, { passive: true }));
+setInterval(checkIdle, 15000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) checkIdle(); });
 </script>
 </body>
 </html>
