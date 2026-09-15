@@ -168,6 +168,37 @@ a{color:var(--gold)}
   .quick-links{gap:8px}
 }
 </style>
+<!-- ── 站內版覆寫：嵌進分隊資訊站時改成跟站一樣的淺色主題，高度由外層依內容自動調整 ── -->
+<style>
+:root{
+  --bg:#fafafa;
+  --card:#fff;
+  --line:#eee;
+  --gold:#c2410c;
+  --gold2:#ea580c;
+  --glow:rgba(194,65,12,.10);
+  --text:#1f2937;
+  --muted:#9ca3af;
+  --done:#9ca3af;
+}
+body{background:transparent;min-height:0}
+.wrap{max-width:none;padding:0 0 4px}
+.top{margin-bottom:14px}
+.clock{font-size:26px}
+.quick-links{border-color:var(--line);box-shadow:none}
+.quick-links a{background:#fff}
+.quick-links a:hover{background:#fff4ea;box-shadow:none}
+.slot{background:#fff}
+.slot:hover:not(.active){border-color:#d1d5db}
+.slot.active{background:#fff4ea;box-shadow:inset 0 -3px 0 var(--gold)}
+.add-row textarea{background:#fff}
+.add-btn{color:#fff}
+.check.checked::after{color:#fff}
+.item.pinned{background:#fff4ea;border-color:#fde7d3}
+.item{background:#fff}
+.del-btn:hover{background:#fef2f2}
+.setup-box{background:#fff}
+</style>
 </head>
 <body>
 

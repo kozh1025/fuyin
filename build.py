@@ -616,10 +616,8 @@ TEMPLATE = r'''<!DOCTYPE html>
   }
 
   /* ---------- Embed（整頁嵌入的小 app）---------- */
-  .embed-frame{
-    display:block;width:100%;height:calc(100vh - 150px);min-height:520px;
-    border:1px solid #eee;border-radius:12px;background:#0a0907;
-  }
+  /* 高度由 fitEmbed() 依內頁實際內容調整，讓它看起來就是這一頁的內容而不是一個黑框 */
+  .embed-frame{display:block;width:100%;height:320px;border:0;background:transparent}
 
   /* ---------- Work ---------- */
   .work-list{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;max-width:820px}
@@ -704,7 +702,6 @@ TEMPLATE = r'''<!DOCTYPE html>
     .gallery{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
     .card-body{padding:12px}
     .doc{padding:22px 18px}
-    .embed-frame{height:calc(100vh - 215px);min-height:420px}
     .work-list{grid-template-columns:1fr}
     .work-card-head{flex-wrap:wrap}
     .btn{padding:7px 8px;font-size:12px}
@@ -808,6 +805,21 @@ function cardHtml(item, i) {
     </div>`;
 }
 
+// 嵌入頁是同網域，直接量內頁高度來撐 iframe；內容變動（新增任務、切時段）時跟著調。
+function fitEmbed(frame) {
+  let doc;
+  try { doc = frame.contentDocument; } catch (e) { return; }
+  if (!doc || !doc.body) return;
+  // 量 body 而不是 documentElement.scrollHeight：後者至少等於 iframe 自己的高度，只會長不會縮。
+  const apply = () => { frame.style.height = Math.ceil(doc.body.getBoundingClientRect().height) + 'px'; };
+  apply();
+  const RO = frame.contentWindow && frame.contentWindow.ResizeObserver;
+  if (RO) new RO(apply).observe(doc.body);
+  // 背景分頁 ResizeObserver 可能不會觸發，操作後與定時再補量一次
+  ['click', 'input', 'keyup'].forEach(ev => doc.addEventListener(ev, () => setTimeout(apply, 50)));
+  setInterval(apply, 1500);
+}
+
 function workHtml(w) {
   return `
     <div class="work-card">
@@ -856,6 +868,8 @@ function renderCategory(cat) {
     content.innerHTML = `<div class="work-list">${(cat.works || []).map(workHtml).join('')}</div>`;
   } else if (cat.type === 'embed') {
     content.innerHTML = `<iframe class="embed-frame" src="${cat.embed}" title="${esc(cat.name)}"></iframe>`;
+    const frame = content.querySelector('.embed-frame');
+    frame.addEventListener('load', () => fitEmbed(frame));
   } else {
     const imgs = (cat.images || []).map(im =>
       `<img class="doc-image" data-action="docimg" data-full="${im.full}" src="${im.full}" alt="${esc(im.alt)}" loading="lazy">`
