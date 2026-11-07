@@ -333,7 +333,12 @@ def collect_files(d: Path, rel_dir: str):
 
 def build_gallery(cat_dir: Path, rel_dir: str, path_id: str, share: bool = True):
     items = []
-    for f in sorted(cat_dir.iterdir()):
+    def _ord(f):
+        try:
+            return (int(read_md(f.with_suffix('.md'))[0].get('order', 50)), f.name)
+        except ValueError:
+            return (50, f.name)
+    for f in sorted(cat_dir.iterdir(), key=_ord):
         if not f.is_file() or f.suffix.lower() not in IMAGE_EXT:
             continue
         if f.name.startswith(('_', '.')):
