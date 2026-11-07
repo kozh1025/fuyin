@@ -11,7 +11,9 @@ content/<區塊>/<類別>/
     10-生活/  →  顯示「生活」，排在 20-公務 前面
 
 類別型態（由該類別資料夾內的 _index.md 的 type: 決定，預設 gallery）
-  gallery  圖片卡片牆。掃描 *.jpg/*.png，同名 .md 為選配的補充資料。
+  gallery  圖片卡片牆。掃描 *.jpg/*.png，同名 .md 為選配的補充資料
+           （frontmatter 可寫 phone: 電話，會顯示在卡片標題下方並可點擊撥打）。
+           類別 _index.md 寫 share: false，卡片就不顯示「傳到 LINE」。
   doc      業務說明頁。_index.md 為內文，files/ 內的檔案成為附件下載區。
   files    純檔案清單。files/ 內的檔案（沒有的話就掃類別資料夾本身）。
   work     文字範本卡片牆。_index.md 內文用 `## 標題` 切成多張卡，
@@ -329,7 +331,7 @@ def collect_files(d: Path, rel_dir: str):
 # 掃描 content/
 # --------------------------------------------------------------------------
 
-def build_gallery(cat_dir: Path, rel_dir: str, path_id: str):
+def build_gallery(cat_dir: Path, rel_dir: str, path_id: str, share: bool = True):
     items = []
     for f in sorted(cat_dir.iterdir()):
         if not f.is_file() or f.suffix.lower() not in IMAGE_EXT:
@@ -346,6 +348,7 @@ def build_gallery(cat_dir: Path, rel_dir: str, path_id: str):
             'title': title,
             'img': copy_asset(f, rel_dir),
             'thumb': make_thumb(f, rel_dir),
+            'share': share,
             'phone': meta.get('phone', ''),
             'address': meta.get('address', ''),
             'tags': meta.get('tags', []),
@@ -383,7 +386,9 @@ def build_category(sec_slug: str, cat_dir: Path):
     }
 
     if ctype == 'gallery':
-        cat['items'] = build_gallery(cat_dir, rel_dir, path_id)
+        # _index.md 寫 share: false → 這個類別的卡片不顯示「傳到 LINE」
+        share = meta.get('share', 'true').strip().lower() != 'false'
+        cat['items'] = build_gallery(cat_dir, rel_dir, path_id, share)
         cat['count'] = len(cat['items'])
     elif ctype == 'work':
         # work 型：整份 _index.md 用 `## 標題` 切成多個可直接複製文字的項目卡。
@@ -519,7 +524,8 @@ TEMPLATE = r'''<!DOCTYPE html>
   .search input:focus{outline:none;border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,.12)}
 
   /* ---------- Gallery ---------- */
-  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px}
+  /* 一排最多 6 張：每欄至少是容器寬度的 1/6（扣掉 5 個間距），再寬也不會擠出第 7 欄 */
+  .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(max(160px,calc((100% - 100px)/6)),1fr));gap:20px}
   .card{
     background:#fff;border:1px solid #eee;border-radius:12px;overflow:hidden;
     display:flex;flex-direction:column;transition:box-shadow .2s,transform .2s;
@@ -798,9 +804,9 @@ function cardHtml(item, i) {
         ${item.note ? `<div class="card-note">${item.note}</div>` : ''}
         ${files.length
           ? `<div class="card-files">${files.map(f => fileChip(f)).join('')}</div>`
-          : `<div class="card-actions">
+          : (item.share === false ? '' : `<div class="card-actions">
           <button class="btn btn-line" data-action="line">傳到 LINE</button>
-        </div>`}
+        </div>`)}
       </div>
     </div>`;
 }
